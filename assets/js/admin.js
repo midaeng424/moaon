@@ -1,7 +1,25 @@
 /* 관리자 페이지 — 틀(로그인 · 메뉴 · 화면 전환) + 공통 도구 */
 (function () {
-  MO.setTokenKey('admin');
+  MO.setTokenKey('admin', true);
   const A = (window.ADM = { pages: {}, st: { year: new Date().getFullYear() } });
+  /* ---------- 로그인 유지: 화면을 벗어나면 로그아웃, 기본 2시간 + 연장 ---------- */
+  // 새로고침만 로그인을 이어 가요. 탭·창·홈 화면 앱을 닫았다 열거나, 다른 곳에 갔다가 돌아오면 다시 로그인해요.
+  try { const nav = performance.getEntriesByType('navigation')[0]; if (!nav || nav.type !== 'reload') { MO.sstore.del('admin'); MO.sstore.del('adminDL'); } } catch (e) {}
+  window.addEventListener('pageshow', (e) => { if (e.persisted) { MO.sstore.del('admin'); MO.sstore.del('adminDL'); location.reload(); } });
+  const SS = { dl: 0, warned: false, timer: null };
+  const fmtLeft = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sc = t % 60; return `${h}:${String(m).padStart(2, '0')}:${String(sc).padStart(2, '0')}`; };
+  A.sess = {
+    set(token, ttl) { MO.sstore.set('admin', token); SS.dl = Date.now() + (ttl || 7200000); MO.sstore.set('adminDL', SS.dl); SS.warned = false; },
+    clear() { MO.sstore.del('admin'); MO.sstore.del('adminDL'); clearInterval(SS.timer); SS.timer = null; },
+    start() { SS.dl = MO.sstore.get('adminDL', 0) || (Date.now() + 7200000); clearInterval(SS.timer); SS.timer = setInterval(tick, 1000); tick(); },
+    async extend() { try { const r = await MO.api('sessionExtend', {}, { loader: false }); A.sess.set(r.token, r.ttl); tick(); MO.toast('로그인 시간을 2시간으로 늘렸어요', 'ok'); } catch (e) { MO.err(e); } }
+  };
+  function tick() {
+    const left = SS.dl - Date.now();
+    document.querySelectorAll('[data-sess]').forEach(el => { el.textContent = fmtLeft(left); el.closest('.sess') && el.closest('.sess').classList.toggle('low', left <= 5 * 60000); });
+    if (left <= 0) { A.sess.clear(); document.querySelectorAll('.scrim').forEach(x => x.remove()); showLogin(); MO.toast('로그인 시간이 끝나서 로그아웃했어요. 다시 로그인해 주세요.'); return; }
+    if (left <= 5 * 60000 && !SS.warned) { SS.warned = true; MO.confirm('로그인 시간이 5분 남았어요. 2시간 더 연장할까요?', { ok: '연장하기', cancel: '괜찮아요' }).then(ok => { if (ok) A.sess.extend(); }); }
+  }
   const app = document.getElementById('app');
   const esc = MO.esc;
 
@@ -37,7 +55,9 @@
   A.clsColor = (id) => { const c = A.cls(id); return c ? c.color : '#c9bba6'; };
   A.teacher = (id) => (A.st.boot.teachers || []).find(t => t.id === id);
   A.stu = (id) => (A.st.boot.students || []).find(s => s.id === id);
-  A.av = (name, color, size = 30) => `<span class="av" style="--c:${color};width:${size}px;height:${size}px">${esc(String(name || '').slice(-2))}</span>`;
+  A.PRESETS = Array.from({ length: 15 }, (_, i) => 'preset:av' + String(i + 1).padStart(2, '0'));
+  A.photoSrc = (p) => /^preset:av\d{2}$/.test(p || '') ? MO.asset('avatars/' + p.slice(7) + '.webp') : /^data:image\/(jpeg|png|webp);base64,/.test(p || '') ? p : '';
+  A.av = (name, color, size = 30, photo) => { const src = A.photoSrc(photo); return `<span class="av" style="--c:${color};width:${size}px;height:${size}px">${src ? `<img src="${esc(src)}" alt="">` : esc(String(name || '').slice(-2))}</span>`; };
   A.activeClasses = () => (A.st.boot.classes || []).filter(c => c.active);
   A.grades = () => [...new Set(A.activeClasses().map(c => c.grade))].sort();
   A.empty = (msg, img = 'moa.webp') => `<div class="empty"><img src="${MO.asset(img)}" alt="">${msg}</div>`;
@@ -84,7 +104,7 @@
 
   /* ---------- 로그인 ---------- */
   function showLogin() {
-    A.st.me = null;
+    A.st.me = null; clearInterval(SS.timer); SS.timer = null;
     app.innerHTML = `<div class="alogin"><form class="box" id="lf"><img src="${MO.asset('logo.webp')}" alt="모아온"><h2>관리자 로그인</h2>
       <label class="fld"><span>아이디</span><input class="inp" id="lid" autocomplete="username" autocapitalize="none" required></label>
       <label class="fld"><span>비밀번호</span><input class="inp" id="lpw" type="password" autocomplete="current-password" required></label>
@@ -96,8 +116,8 @@
       e.preventDefault();
       try {
         const r = await MO.api('adminLogin', { loginId: f.querySelector('#lid').value.trim(), password: f.querySelector('#lpw').value }, { token: '' });
-        MO.store.set('admin', r.token); MO.store.set('lastAdmin', r.me.loginId);
-        if (r.me.mustChange) { A.st.me = r.me; const ok = await changePw(true); if (!ok) { MO.store.del('admin'); return showLogin(); } }
+        A.sess.set(r.token, r.ttl); MO.store.set('lastAdmin', r.me.loginId);
+        if (r.me.mustChange) { A.st.me = r.me; const ok = await changePw(true); if (!ok) { A.sess.clear(); return showLogin(); } }
         boot();
       } catch (err) { MO.err(err); }
     };
@@ -115,17 +135,36 @@
     }
   }
   A.changePw = changePw;
-  A.logout = async () => { if (await MO.confirm('로그아웃할까요?', { ok: '로그아웃' })) { MO.store.del('admin'); showLogin(); } };
+  /** 사진 고르기 칸 (프로필) — 반환: { el, value() } */
+  A.photoPicker = (name, color, photo) => {
+    const el = document.createElement('div'); el.className = 'fld'; let val = photo || '';
+    const paint = () => {
+      el.innerHTML = `<span>프로필 사진 <small class="note">(선택 · 로이&모아 중에 고르거나 직접 올려요)</small></span>
+        <div class="ppick">${A.av(name, color, 64, val)}<div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn o sm" style="cursor:pointer">${MO.icon('cam', 14)}내 사진 올리기<input type="file" accept="image/jpeg,image/png,image/webp" hidden data-pf></label>${val ? '<button type="button" class="btn o sm" data-prm>사진 빼기</button>' : ''}</div></div>
+        <div class="pgrid">${A.PRESETS.map(p => `<button type="button" class="pav ${p === val ? 'on' : ''}" data-pp="${p}" aria-label="기본 이미지 ${p.slice(9)}"><img src="${MO.asset('avatars/' + p.slice(7) + '.webp')}" alt=""></button>`).join('')}</div>`;
+      el.querySelector('[data-pf]').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return MO.toast('JPG·PNG 사진만 올릴 수 있어요', 'err'); try { val = await MO.squarePhoto(f); paint(); } catch (er) { MO.err(er); } };
+      el.querySelectorAll('[data-pp]').forEach(b => b.onclick = () => { val = b.dataset.pp; paint(); });
+      const rm = el.querySelector('[data-prm]'); if (rm) rm.onclick = () => { val = ''; paint(); };
+    };
+    paint(); return { el, value: () => val };
+  };
+  A.profile = async () => {
+    const me = A.st.me, pk = A.photoPicker(me.name, me.role === 'master' ? '#3f3228' : '#d98a1c', me.photo);
+    const v = await MO.form({ title: '내 프로필', submit: '저장', fields: [{ key: 'name', label: '이름', value: me.name, required: true }], extra: pk.el });
+    if (!v) return;
+    try { const r = await MO.api('profileSave', { name: v.name, photo: pk.value() }); A.st.me = Object.assign(A.st.me, r); A.st.boot.me = A.st.me; MO.toast('저장했어요', 'ok'); A.reshell(); route(); } catch (e) { MO.err(e); }
+  };
+  A.logout = async () => { if (await MO.confirm('로그아웃할까요?', { ok: '로그아웃' })) { A.sess.clear(); showLogin(); } };
   MO.onAuthFail = async (err) => {
     if (err.code === 'PWCHANGE') { if (await changePw(true)) location.reload(); return; }
-    MO.store.del('admin'); showLogin();
+    A.sess.clear(); showLogin();
   };
 
   /* ---------- 틀 ---------- */
   async function boot() {
-    try { await A.refreshBoot(); } catch (e) { if (e.code !== 'AUTH' && e.code !== 'PWCHANGE') { MO.err(e); app.innerHTML = `<div class="alogin"><div class="box">${A.empty(esc(e.message), 'face_moa3.webp')}<button class="btn" onclick="location.reload()">다시 시도</button></div></div>`; } return; }
+    try { await A.refreshBoot(); } catch (e) { if (e.code !== 'AUTH' && e.code !== 'PWCHANGE') { MO.err(e); app.innerHTML = `<div class="alogin"><div class="box">${A.empty(esc(e.message), 'face_moa3.webp')}<button class="btn" id="bootRetry">다시 시도</button></div></div>`; const rb = app.querySelector('#bootRetry'); if (rb) rb.onclick = () => location.reload(); } return; }
     A.st.year = Number(A.st.boot.today.slice(0, 4));
-    shell(); route();
+    shell(); route(); A.sess.start();
   }
   function shell() {
     const me = A.st.me, vis = A.MENU.filter(A.visible);
@@ -134,7 +173,9 @@
     const ordered = me.role === 'pastor' ? [...g3, ...g1, ...g2] : [...g1, ...g2, ...g3];
     app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><img src="${MO.asset('logo.webp')}" alt="모아온"><small>${esc(A.st.boot.org)} · 관리자</small></div>
       ${me.role === 'pastor' ? g3.map(navBtn).join('') + '<hr>' + g1.map(navBtn).join('') + g2.map(navBtn).join('') : g1.map(navBtn).join('') + (g2.length ? '<hr>' + g2.map(navBtn).join('') : '') + '<div class="grow"></div>' + (g3.length ? '<hr>' + g3.map(navBtn).join('') : '')}
-      <div class="mecard"><div><b>${esc(me.name)}</b> <span class="role" style="--b:${me.role === 'master' ? '#3f3228' : '#fff3d6'};--c:${me.role === 'master' ? '#fff' : '#a8621f'}">${esc(me.roleLabel)}</span><br><small>${esc(me.loginId)}</small></div><div class="acts"><button class="btn o sm" data-act="pw">${MO.icon('key', 14)}비밀번호</button><button class="btn o sm" data-act="logout">${MO.icon('logout', 14)}로그아웃</button></div></div></aside>
+      <div class="mecard"><div class="mehead"><button class="meav" data-act="profile" title="내 프로필 · 사진 바꾸기">${A.av(me.name, me.role === 'master' ? '#3f3228' : '#d98a1c', 40, me.photo)}</button><div><b>${esc(me.name)}</b> <span class="role" style="--b:${me.role === 'master' ? '#3f3228' : '#fff3d6'};--c:${me.role === 'master' ? '#fff' : '#a8621f'}">${esc(me.roleLabel)}</span></div></div>
+        <div class="sess"><span title="남은 로그인 시간">${MO.icon('clock', 14)}<b data-sess>2:00:00</b></span><i></i><button data-act="extend">연장</button></div>
+        <div class="acts"><button class="btn o sm" data-act="pw">${MO.icon('key', 14)}비밀번호</button><button class="btn o sm" data-act="logout">${MO.icon('logout', 14)}로그아웃</button></div></div></aside>
       <main class="mn"><header class="top"><img class="mlogo" src="${MO.asset('logo.webp')}" alt=""><h1 id="ttl"></h1><div class="tr" id="tr"></div></header><div class="pg" id="pg"></div></main>
       <nav class="mnav" id="mnav"></nav></div>`;
     const prim = ordered.slice(0, 4);
@@ -143,6 +184,8 @@
       const g = e.target.closest('[data-go]'); if (g && g.closest('.side,.mnav')) { location.hash = g.dataset.go; return; }
       const a = e.target.closest('[data-act]'); if (!a || !a.closest('.side,.mnav')) return;
       if (a.dataset.act === 'pw') changePw(false);
+      if (a.dataset.act === 'extend') A.sess.extend();
+      if (a.dataset.act === 'profile') A.profile();
       if (a.dataset.act === 'logout') A.logout();
       if (a.dataset.act === 'more' || a.dataset.act === 'me') moreSheet(ordered);
     };
@@ -150,8 +193,9 @@
   function moreSheet(list) {
     const me = A.st.me;
     const m = MO.modal({ title: '메뉴', foot: false, body: `<div class="list">${list.map(x => `<button class="li" data-go="${x.key}" style="width:100%;text-align:left">${MO.icon(x.icon, 22)}<div><b>${esc(x.label)}</b></div>${x.badge ? `<span class="tag">${x.badge}</span>` : ''}</button>`).join('')}
-      <div class="li"><div><b>${esc(me.name)} · ${esc(me.roleLabel)}</b><span>${esc(me.loginId)}</span></div><button class="btn o sm" data-a="pw">비밀번호</button><button class="btn o sm" data-a="out">로그아웃</button></div></div>` });
-    m.body.onclick = (e) => { const g = e.target.closest('[data-go]'); if (g) { m.close(); location.hash = g.dataset.go; } const b = e.target.closest('[data-a]'); if (b) { m.close(); b.dataset.a === 'pw' ? changePw(false) : A.logout(); } };
+      <div class="li"><button class="meav" data-a="prof">${A.av(me.name, me.role === 'master' ? '#3f3228' : '#d98a1c', 40, me.photo)}</button><div><b>${esc(me.name)} · ${esc(me.roleLabel)}</b><span class="sess">${MO.icon('clock', 13)}<b data-sess>${fmtLeft(SS.dl - Date.now())}</b><i></i><button data-a="ext">연장</button></span></div></div>
+      <div class="li" style="justify-content:flex-end"><button class="btn o sm" data-a="pw">비밀번호</button><button class="btn o sm" data-a="out">로그아웃</button></div></div>` });
+    m.body.onclick = (e) => { const g = e.target.closest('[data-go]'); if (g) { m.close(); location.hash = g.dataset.go; } const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === 'ext') return A.sess.extend(); m.close(); if (b.dataset.a === 'pw') changePw(false); else if (b.dataset.a === 'prof') A.profile(); else A.logout(); };
   }
   A.setTitle = (title, right = '') => {
     document.getElementById('ttl').innerHTML = esc(title) + `<small>${A.st.year}년</small>`;
@@ -181,6 +225,7 @@
     catch (e) { if (e.code !== 'AUTH' && e.code !== 'PWCHANGE') { MO.err(e); pg.innerHTML = `<div class="card">${A.empty(esc(e.message), 'face_moa3.webp')}<div style="text-align:center"><button class="btn" id="retry">다시 시도</button></div></div>`; pg.querySelector('#retry').onclick = route; } }
   }
   A.reload = () => route();
+  A.reshell = () => { shell(); A.sess.start(); };
   window.addEventListener('hashchange', route);
 
   window.addEventListener('DOMContentLoaded', () => { if (MO.token()) boot(); else showLogin(); });

@@ -11,13 +11,26 @@
   };
 
   /* ---------- 서버 호출 ---------- */
-  let tokenKey = 'token';
-  MO.setTokenKey = (k) => { tokenKey = k; };
-  MO.token = () => MO.store.get(tokenKey, '');
+  /** 탭을 닫으면 지워지는 저장소 (관리자 로그인용) */
+  MO.sstore = {
+    get(k, d) { try { const v = sessionStorage.getItem('moaon:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { sessionStorage.setItem('moaon:' + k, JSON.stringify(v)); } catch (e) {} },
+    del(k) { try { sessionStorage.removeItem('moaon:' + k); } catch (e) {} }
+  };
+  let tokenKey = 'token', tokenSession = false;
+  MO.setTokenKey = (k, session) => { tokenKey = k; tokenSession = !!session; };
+  MO.token = () => (tokenSession ? MO.sstore : MO.store).get(tokenKey, '');
+  /** 사진을 정사각형으로 잘라 작게 줄여요 (프로필용) */
+  MO.squarePhoto = (file, size = 200, q = 0.82) => new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { const c = document.createElement('canvas'); c.width = c.height = size; const k = Math.min(im.naturalWidth, im.naturalHeight), sx = (im.naturalWidth - k) / 2, sy = (im.naturalHeight - k) / 2; c.getContext('2d').drawImage(im, sx, sy, k, k, 0, 0, size, size); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', q)); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('사진을 읽지 못했어요. 다른 사진을 골라 주세요.')); };
+    im.src = url;
+  });
   MO.onAuthFail = null;
   MO.api = async function (action, data = {}, opt = {}) {
     const url = CFG.API_URL;
-    if (!url || /여기에|YOUR_|XXXX/.test(url)) throw new Error('config.js 파일에 서버 주소(API_URL)를 넣어 주세요.');
+    if (!url || /여기에|YOUR_/.test(url)) throw new Error('config.js 파일에 서버 주소(API_URL)를 넣어 주세요.');
     const showLoader = opt.loader !== false;
     let timer = showLoader ? setTimeout(() => MO.loader(true), 350) : null;
     try {
@@ -83,9 +96,9 @@
     document.body.appendChild(sc);
     return { el: sc, body: b, foot: f, close };
   };
-  MO.confirm = function (msg, { ok = '확인', danger = false, title = '확인해 주세요' } = {}) {
+  MO.confirm = function (msg, { ok = '확인', cancel = '취소', danger = false, title = '확인해 주세요' } = {}) {
     return new Promise((res) => {
-      const m = MO.modal({ title, body: `<p style="margin:0;font-weight:600;line-height:1.6">${MO.esc(msg).replace(/\n/g, '<br>')}</p>`, foot: `<button class="btn o" data-v="0">취소</button><button class="btn ${danger ? 'r' : ''}" data-v="1">${MO.esc(ok)}</button>`, onClose: () => res(false) });
+      const m = MO.modal({ title, body: `<p style="margin:0;font-weight:600;line-height:1.6">${MO.esc(msg).replace(/\n/g, '<br>')}</p>`, foot: `<button class="btn o" data-v="0">${MO.esc(cancel)}</button><button class="btn ${danger ? 'r' : ''}" data-v="1">${MO.esc(ok)}</button>`, onClose: () => res(false) });
       m.foot.querySelectorAll('button').forEach(b => b.onclick = () => { const v = b.dataset.v === '1'; m.el.remove(); res(v); });
     });
   };
@@ -111,7 +124,9 @@
         } else if (fd.type === 'checkbox') {
           el.className = 'check'; el.innerHTML = `<input type="checkbox" id="${id}" ${fd.value ? 'checked' : ''}> ${MO.esc(fd.label)}`;
         } else if (fd.type === 'color') {
-          input = `<div class="chips" data-color>${['#ee8b72','#5b9bd5','#eea21f','#78a744','#a46cf0','#d4863c','#17bfa9','#9a6b4b'].map(c => `<button type="button" class="chip" data-c="${c}" style="background:${c};width:34px;height:34px;padding:0;${c === fd.value ? 'outline:3px solid #3f3228;outline-offset:2px' : ''}"></button>`).join('')}</div><input type="hidden" id="${id}" value="${MO.esc(fd.value || '#eea21f')}">`;
+          const cur = fd.value || '#eea21f', inPal = MO.PALETTE.includes(cur.toLowerCase());
+          input = `<div class="pal"><div class="palg">${MO.PALETTE.map((c, i) => `<button type="button" class="pc ${c === cur.toLowerCase() ? 'on' : ''}" data-c="${c}" style="--c:${c}" aria-label="${c}"></button>${i === 11 ? `<label class="pc pcx ${inPal ? '' : 'on'}" title="직접 고르기" style="--c:${inPal ? 'transparent' : cur}"><input type="color" value="${MO.esc(cur)}" data-cx></label>` : ''}`).join('')}</div>
+            <div class="palp"><span class="pv" style="--c:${cur}">가</span><span class="note">선택한 색 <b data-hex>${MO.esc(cur)}</b> · 무지개 칸을 누르면 원하는 색을 직접 고를 수 있어요</span></div></div><input type="hidden" id="${id}" value="${MO.esc(cur)}">`;
         } else {
           const t = fd.type === 'money' ? 'text' : (fd.type || 'text');
           input = `<input class="inp" id="${id}" type="${t}" ${fd.type === 'money' || fd.type === 'number' ? 'inputmode="numeric"' : ''} value="${MO.esc(fd.type === 'money' && fd.value ? MO.comma(fd.value) : (fd.value ?? ''))}" placeholder="${MO.esc(fd.placeholder || '')}" ${fd.max ? `maxlength="${fd.max}"` : ''} autocomplete="off">`;
@@ -121,14 +136,19 @@
         if (fd.half) { if (!grid) { grid = document.createElement('div'); grid.className = 'row2'; wrap.appendChild(grid); } grid.appendChild(el); if (grid.children.length === 2) grid = null; }
         else { grid = null; wrap.appendChild(el); }
         if (fd.type === 'money') { const inp = el.querySelector('input'); inp.addEventListener('input', () => { const n = MO.parseNum(inp.value); inp.value = n ? MO.comma(n) : ''; }); }
-        if (fd.type === 'color') el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { el.querySelector('input').value = b.dataset.c; el.querySelectorAll('[data-c]').forEach(x => x.style.outline = ''); b.style.outline = '3px solid #3f3228'; b.style.outlineOffset = '2px'; });
+        if (fd.type === 'color') {
+          const hid = el.querySelector('input[type=hidden]'), cx = el.querySelector('[data-cx]'), lab = cx.parentElement;
+          const pick = (c, btn) => { c = MO.safeColor(c); hid.value = c; cx.value = c; el.querySelectorAll('.pc').forEach(x => x.classList.toggle('on', x === btn)); el.querySelector('.pv').style.setProperty('--c', c); el.querySelector('[data-hex]').textContent = c; if (btn === lab) lab.style.setProperty('--c', c); };
+          el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => pick(b.dataset.c, b));
+          cx.oninput = () => pick(cx.value, lab);
+        }
       });
       if (extra) { const ex = typeof extra === 'string' ? Object.assign(document.createElement('div'), { innerHTML: extra }) : extra; wrap.appendChild(ex); }
       const m = MO.modal({ title, body: wrap, wide, foot: `<button class="btn o" data-v="0">취소</button><button class="btn ${danger ? 'r' : ''}" data-v="1">${MO.esc(submit)}</button>`, onClose: () => res(null) });
       const collect = () => {
         const out = {};
         wrap.querySelectorAll('[data-key]').forEach(el => {
-          const k = el.dataset.key, t = el.dataset.type, inp = el.querySelector('input,select,textarea');
+          const k = el.dataset.key, t = el.dataset.type, inp = t === 'color' ? el.querySelector('input[type=hidden]') : el.querySelector('input,select,textarea');
           out[k] = t === 'checkbox' ? inp.checked : t === 'money' || t === 'number' ? MO.parseNum(inp.value) : inp.value.trim();
         });
         return out;
@@ -171,6 +191,17 @@
     img.src = url;
   });
   MO.b64ToBlob = (b64, mime) => { const bin = atob(b64); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], { type: mime }); };
+  /** 반 색상표: 흰 글자가 잘 보이는 중간 밝기 24색 */
+  MO.PALETTE = ['#ee8b72', '#e5675a', '#e0607e', '#d36aa8', '#b06ad9', '#8b6cf0', '#6d7fe0', '#5b9bd5', '#2f9fd0', '#1aa9b8', '#17a98f', '#3fae6a',
+    '#78a744', '#9aa63a', '#d9a21a', '#eea21f', '#e8861a', '#d4863c', '#c0703c', '#9a6b4b', '#7d5a44', '#7f8796', '#5f7a8c', '#4a6fa5'];
+  /** 너무 밝은 색은 흰 글자가 보이도록 조금 진하게 */
+  MO.safeColor = (hex) => {
+    let m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return '#eea21f';
+    let [r, g, b] = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+    const lum = (r, g, b) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    for (let k = 0; k < 20 && (1.05 / (lum(r, g, b) + 0.05)) < 2.4; k++) { r = Math.round(r * 0.92); g = Math.round(g * 0.92); b = Math.round(b * 0.92); }
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+  };
   MO.download = (name, blob) => { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); };
   MO.csv = (name, rows) => {
     const s = rows.map(r => r.map(v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
@@ -220,6 +251,7 @@
 
   /* ---------- 아이콘 ---------- */
   const P = {
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     home: '<path d="M4 11l8-7 8 7v9H4z"/>', dash: '<rect x="3" y="3" width="8" height="8" rx="2.5"/><rect x="13" y="3" width="8" height="5" rx="2.5"/><rect x="13" y="10" width="8" height="11" rx="2.5"/><rect x="3" y="13" width="8" height="8" rx="2.5"/>',
     att: '<rect x="3.5" y="5" width="17" height="15" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/>', off: '<path d="M4 9h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 9V7a4 4 0 0 1 8 0v2M12 13v4"/>',
     tal: '<circle cx="12" cy="12" r="8.5"/><path d="M9 9h6M12 9v7"/>', acc: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',

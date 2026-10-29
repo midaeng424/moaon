@@ -186,7 +186,7 @@
   };
 
   /* =================== 반 관리 =================== */
-  let mvFrom = '', mvSel = new Set();
+  let mvFrom = '', mvSel = new Set(), clsGrade = 0;
   P.cls = async function (pg) {
     const canE = A.edit('cls');
     A.setTitle('반 관리', A.readonlyBadge('cls'));
@@ -195,9 +195,23 @@
     const draw = () => {
       if (!mvFrom && B.classes[0]) mvFrom = B.classes[0].id;
       const mvList = B.students.filter(s => s.status !== '졸업' && s.classId === mvFrom);
-      pg.innerHTML = `<div class="card" style="display:flex;align-items:center;gap:14px;background:linear-gradient(110deg,#edf5e1,#fff3d6);box-shadow:none"><img src="${MO.asset('moa.webp')}" style="height:76px;margin:-12px 0" alt=""><div style="flex:1"><b style="font-size:17px;font-weight:900">반 이름과 담임 선생님은 서기가 직접 등록·수정해요</b><p class="note" style="margin:4px 0 0;font-size:13px">여기서 바꾸면 교적부 · 출석 · 달란트 · 아이 앱 로그인 화면의 반 목록에 바로 반영돼요.</p></div></div>
-        <div class="ccards">${B.classes.map(c => `<div class="ccard" style="${c.active ? '' : 'opacity:.6'}"><div style="display:flex;justify-content:space-between;align-items:center"><span class="tag" style="--b:${c.color}22;--c:${c.color}">${c.grade}학년${c.active ? '' : ' · 사용 안 함'}</span>${canE ? `<button class="btn o sm" data-cedit="${c.id}">수정</button>` : ''}</div><div class="nm"><i style="--c:${c.color}">${esc(c.name.slice(0, 1))}</i><b>${esc(c.name)}</b></div><table class="t"><tbody><tr><td class="note">담임</td><td class="r"><b>${esc(c.teacherName || '-')}</b></td></tr><tr><td class="note">보조</td><td class="r"><b>${esc(c.assistantName || '-')}</b></td></tr><tr><td class="note">학생</td><td class="r"><b>${c.count}명</b></td></tr></tbody></table></div>`).join('')}
-          ${canE ? `<button class="addcard" data-cadd="1"><span><span style="display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:var(--soft);margin:0 auto 8px;font-size:28px">+</span>반 추가</span></button>` : ''}</div>
+      const cls = B.classes.slice().sort((a, b) => (b.active - a.active) || a.grade - b.grade || a.order - b.order);
+      const cnt = (id) => B.students.filter(s => s.status !== '졸업' && s.classId === id).length;
+      const tname = (id) => { const t = B.teachers.find(x => x.id === id); return t ? t.name : ''; };
+      const grades = [...new Set(cls.map(c => c.grade))].sort((a, b) => a - b);
+      if (clsGrade && !grades.includes(clsGrade)) clsGrade = 0;
+      const shown = cls.filter(c => !clsGrade || c.grade === clsGrade);
+      const tile = (c) => { const t1 = tname(c.teacherId), t2 = tname(c.assistantId), tag = canE ? 'button' : 'div';
+        return `<${tag} class="ctile ${c.active ? '' : 'off'}" style="--c:${c.color}" ${canE ? `data-cedit="${c.id}" title="눌러서 수정"` : ''}><i>${esc(c.name.slice(0, 1))}</i><div class="ct"><b>${esc(c.name)}${c.active ? '' : ' <small>사용 안 함</small>'}</b><span>${t1 ? `담임 ${esc(t1)}` : '<em>담임 없음</em>'}${t2 ? ` · 보조 ${esc(t2)}` : ''}</span></div><div class="cc"><b>${cnt(c.id)}</b><small>명</small></div>${canE ? `<span class="ced">${MO.icon('edit', 13)}</span>` : ''}</${tag}>`; };
+      let body = '';
+      (clsGrade ? [clsGrade] : grades).forEach(g => {
+        const gs = shown.filter(c => c.grade === g); if (!gs.length) return;
+        body += `<div class="cgrp"><div class="cgh"><b>${g}학년</b><span>${gs.length}개 반 · 학생 ${gs.reduce((a, x) => a + cnt(x.id), 0)}명</span></div><div class="ctiles">${gs.map(tile).join('')}</div></div>`;
+      });
+      const showCoach = canE && !(() => { try { return localStorage.getItem('moaon_coach_cls') === '1'; } catch (_) { return false; } })();
+      pg.innerHTML = `<div class="card rel" id="clsCard"><div class="ch"><b>반 목록 <button class="qhelp" id="clsHelp" title="도움말" aria-label="도움말">?</button></b><div class="acts"><div class="seg" id="cseg"><button class="${clsGrade ? '' : 'on'}" data-cg="0">전체 <em>${cls.length}</em></button>${grades.map(g => `<button class="${clsGrade === g ? 'on' : ''}" data-cg="${g}">${g}학년 <em>${cls.filter(c => c.grade === g).length}</em></button>`).join('')}</div>${canE ? `<button class="btn" data-cadd="1" id="clsAdd">${MO.icon('plus', 15)}반 추가</button>` : ''}</div></div>
+        ${showCoach ? `<div class="coach" id="coachCls" role="note"><img src="${MO.asset('face_moa.webp')}" alt="" style="width:34px;height:34px;border-radius:11px;flex:none;background:#fff"><div><b>반 이름과 담임은 서기가 직접 관리해요</b><span>반 칸을 누르면 바로 고칠 수 있어요. 여기서 바꾸면 교적부 · 출석 · 달란트 · 아이 앱 로그인 화면의 반 목록에 바로 반영돼요.</span></div><button class="btn sm" id="coachClsOk">알겠어요</button></div>` : ''}
+        ${body || `<div class="empty">${MO.icon('users', 30)}아직 반이 없어요. [반 추가]를 눌러 만들어 주세요.</div>`}</div>
         <div class="g2"><div class="card"><div class="ch"><b>선생님 목록</b>${canE ? `<button class="btn" data-tadd="1">${MO.icon('plus', 15)}선생님 등록</button>` : ''}</div>
           <div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>역할</th><th>담당 반</th><th>연락처</th>${canE ? '<th></th>' : ''}</tr></thead><tbody>
           ${B.teachers.map(t => { const cs = B.classes.filter(c => c.teacherId === t.id || c.assistantId === t.id).map(c => `${c.grade}학년 ${c.name}`).join(', '); return `<tr><td><b>${esc(t.name)}</b></td><td><span class="tag" style="${t.role === '담임' ? '--b:#fff3d6;--c:#a8621f' : '--b:#e6f0fa;--c:#3d7cb8'}">${t.role}</span></td><td>${esc(cs) || '<span class="note">-</span>'}</td><td class="note">${esc(t.phone) || '-'}</td>${canE ? `<td class="r"><button class="btn o sm" data-tedit="${t.id}">수정</button></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="5">${A.empty('선생님을 등록해 주세요')}</td></tr>`}</tbody></table></div></div>
@@ -212,7 +226,7 @@
         { key: 'name', label: '반 이름', value: c ? c.name : '', required: true, half: true, placeholder: '예: 사랑반' },
         { key: 'teacherId', label: '담임 선생님', type: 'select', options: [['', '없음'], ...B.teachers.map(t => [t.id, t.name])], value: c ? c.teacherId : '', half: true },
         { key: 'assistantId', label: '보조 선생님', type: 'select', options: [['', '없음'], ...B.teachers.map(t => [t.id, t.name])], value: c ? c.assistantId : '', half: true },
-        { key: 'color', label: '색', type: 'color', value: c ? c.color : '#eea21f' },
+        { key: 'color', label: '반 색', type: 'color', value: c ? c.color : MO.PALETTE[(B.classes.length * 5) % MO.PALETTE.length] },
         { key: 'active', label: '사용 중인 반', type: 'checkbox', value: c ? c.active : true }],
         extra: c ? `<button type="button" class="btn r sm" data-cdel="${c.id}" style="justify-self:start">${MO.icon('trash', 13)}이 반 지우기</button>` : '' });
       if (!v) return;
@@ -226,7 +240,15 @@
       if (!v) return;
       try { await MO.api('teacherSave', Object.assign({ id: t && t.id }, v)); MO.toast('저장했어요', 'ok'); P.cls(pg); } catch (er) { MO.err(er); }
     };
-    draw();
+    const _draw = draw;
+    const drawAll = () => {
+      _draw();
+      const co = pg.querySelector('#coachCls'), ad = pg.querySelector('#clsAdd');
+      if (co && ad) { const cr = co.getBoundingClientRect(), br = ad.getBoundingClientRect(); co.style.setProperty('--ax', Math.max(14, Math.round(cr.right - (br.left + br.width / 2) - 7)) + 'px'); }
+      const ok = pg.querySelector('#coachClsOk'); if (ok) ok.onclick = () => { try { localStorage.setItem('moaon_coach_cls', '1'); } catch (_) {} co.remove(); };
+      const hp = pg.querySelector('#clsHelp'); if (hp) hp.onclick = () => { try { localStorage.removeItem('moaon_coach_cls'); } catch (_) {} if (A.edit('cls')) drawAll(); else MO.alert('반 관리 안내', '반 이름과 담임 선생님은 서기가 직접 등록·수정해요. 여기서 바꾸면 교적부 · 출석 · 달란트 · 아이 앱 로그인 화면의 반 목록에 바로 반영돼요.'); };
+    };
+    drawAll();
     const delHandler = async (e) => {
       const cd = e.target.closest('[data-cdel]'), td = e.target.closest('[data-tdel]');
       if (!cd && !td) return;
@@ -237,11 +259,12 @@
     document.body.removeEventListener('click', A._clsDel || (() => {})); A._clsDel = delHandler; document.body.addEventListener('click', delHandler);
     pg.onclick = async (e) => {
       if (e.target.closest('[data-cadd]')) return classForm(null);
+      const cg = e.target.closest('[data-cg]'); if (cg) { clsGrade = Number(cg.dataset.cg); return drawAll(); }
       const ce = e.target.closest('[data-cedit]'); if (ce) return classForm(B.classes.find(c => c.id === ce.dataset.cedit));
       if (e.target.closest('[data-tadd]')) return teacherForm(null);
       const te = e.target.closest('[data-tedit]'); if (te) return teacherForm(B.teachers.find(t => t.id === te.dataset.tedit));
-      const f = e.target.closest('[data-from]'); if (f) { mvFrom = f.dataset.from; mvSel = new Set(); return draw(); }
-      const mv = e.target.closest('[data-mv]'); if (mv) { const id = mv.dataset.mv; mvSel.has(id) ? mvSel.delete(id) : mvSel.add(id); return draw(); }
+      const f = e.target.closest('[data-from]'); if (f) { mvFrom = f.dataset.from; mvSel = new Set(); return drawAll(); }
+      const mv = e.target.closest('[data-mv]'); if (mv) { const id = mv.dataset.mv; mvSel.has(id) ? mvSel.delete(id) : mvSel.add(id); return drawAll(); }
       if (e.target.closest('[data-domove]')) {
         const to = pg.querySelector('#mvTo').value; if (!to) return MO.toast('옮길 곳을 골라 주세요', 'err');
         const grad = to === '__grad';
@@ -263,9 +286,9 @@
       .then(() => {}) && setTimeout(() => { const b = document.getElementById('cpy'); if (b) b.onclick = () => navigator.clipboard.writeText(pw).then(() => MO.toast('복사했어요', 'ok')).catch(() => MO.toast('길게 눌러 복사해 주세요')); }, 50);
     const draw = () => {
       pg.innerHTML = `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start" class="pgrid">
-        <div style="display:grid;gap:18px"><div class="card mastercard"><div style="width:70px;height:70px;border-radius:20px;overflow:hidden;flex:none"><img src="${MO.asset('icon-rounded.png')}" alt=""></div><div><span style="font-size:12px;opacity:.75;font-weight:700">마스터 관리자</span><b style="display:block;font-size:25px;font-weight:900;letter-spacing:-.5px">${esc(A.st.me.name)}</b><span style="font-size:12.5px;opacity:.85;font-weight:700">모든 메뉴 편집 · 관리자 권한 부여/해제 · 백업</span></div></div>
+        <div style="display:grid;gap:18px"><div class="card mastercard"><div style="width:70px;height:70px;border-radius:20px;overflow:hidden;flex:none"> <img src="${esc(A.photoSrc(A.st.me.photo) || MO.asset('icon-rounded.png'))}" alt="" style="width:100%;height:100%;object-fit:cover"></div><div><span style="font-size:12px;opacity:.75;font-weight:700">마스터 관리자</span><b style="display:block;font-size:25px;font-weight:900;letter-spacing:-.5px">${esc(A.st.me.name)}</b><span style="font-size:12.5px;opacity:.85;font-weight:700">모든 메뉴 편집 · 관리자 권한 부여/해제 · 백업</span></div></div>
         <div class="card"><div class="ch"><b>관리자 계정</b><button class="btn" data-add="1">${MO.icon('plus', 15)}관리자 초대</button></div>
-          <div class="list">${d.admins.map(a => `<div class="li">${A.av(a.name, RC[a.role][0] === '#3f3228' ? '#3f3228' : RC[a.role][1], 40)}<div><b>${esc(a.name)} <span class="role" style="--b:${RC[a.role][0]};--c:${RC[a.role][1]}">${esc(d.roles[a.role])}</span></b><span>${esc(a.loginId)} · 최근 접속 ${a.lastLogin ? esc(a.lastLogin.slice(0, 16)) : '없음'}</span></div>${a.mustChange ? '<span class="tag" style="--b:#fff3d6;--c:#a8621f">첫 로그인 전</span>' : a.active ? '<span class="tag" style="--b:#edf5e1;--c:#5b8a2e">사용 중</span>' : '<span class="tag">꺼짐</span>'}${a.role !== 'master' ? `<button class="btn o sm" data-edit="${a.id}">설정</button>` : ''}</div>`).join('')}</div>
+          <div class="list">${d.admins.map(a => `<div class="li">${A.av(a.name, RC[a.role][0] === '#3f3228' ? '#3f3228' : RC[a.role][1], 40, a.photo)}<div><b>${esc(a.name)} <span class="role" style="--b:${RC[a.role][0]};--c:${RC[a.role][1]}">${esc(d.roles[a.role])}</span></b><span>${esc(a.loginId)} · 최근 접속 ${a.lastLogin ? esc(a.lastLogin.slice(0, 16)) : '없음'}</span></div>${a.mustChange ? '<span class="tag" style="--b:#fff3d6;--c:#a8621f">첫 로그인 전</span>' : a.active ? '<span class="tag" style="--b:#edf5e1;--c:#5b8a2e">사용 중</span>' : '<span class="tag">꺼짐</span>'}<button class="btn o sm" data-edit="${a.id}">설정</button></div>`).join('')}</div>
           <p class="note" style="margin:10px 0 0;line-height:1.6">관리자 페이지는 마스터·교역자·총무·서기·회계만 들어올 수 있어요. 선생님·아이들은 아이 앱만 써요.</p></div></div>
         <div class="card"><div class="ch"><b>역할별 권한</b><span>칸을 누르면 없음 → 보기 → 편집으로 바뀌어요</span></div>
           <div class="tscroll"><table class="t"><thead><tr><th>메뉴</th><th class="c"><span class="role" style="--b:#3f3228;--c:#fff;margin:0">마스터</span></th>${roles.map(r => `<th class="c"><span class="role" style="--b:${RC[r][0]};--c:${RC[r][1]};margin:0">${d.roles[r]}</span></th>`).join('')}</tr></thead><tbody>
@@ -280,20 +303,29 @@
       const c = e.target.closest('[data-cell]'); if (c) { const [r, m] = c.dataset.cell.split('|'); const maxV = r === 'pastor' ? 1 : 2; mx[r][m] = (mx[r][m] + 1) % (maxV + 1); dirty = true; return draw(); }
       if (e.target.closest('[data-savep]')) { try { await MO.api('permsSave', { matrix: mx }); dirty = false; MO.toast('권한을 저장했어요. 각 관리자가 다시 로그인하거나 새로고침하면 반영돼요.', 'ok'); draw(); } catch (er) { MO.err(er); } return; }
       if (e.target.closest('[data-add]')) {
-        const v = await MO.form({ title: '관리자 초대', submit: '만들기', fields: [{ key: 'name', label: '이름', required: true, placeholder: '예: 박○○' }, { key: 'loginId', label: '아이디 (영문 소문자·숫자)', required: true, placeholder: '예: secretary' }, { key: 'role', label: '역할', type: 'select', options: roles.map(r => [r, d.roles[r]]) }] });
+        const pk = A.photoPicker('새 관리자', '#d98a1c', '');
+        const v = await MO.form({ title: '관리자 초대', submit: '만들기', fields: [{ key: 'name', label: '이름', required: true, placeholder: '예: 박○○' }, { key: 'loginId', label: '아이디 (영문 소문자·숫자)', required: true, placeholder: '예: secretary' }, { key: 'role', label: '역할', type: 'select', options: roles.map(r => [r, d.roles[r]]) }], extra: pk.el });
         if (!v) return;
-        try { const r = await MO.api('adminSave', v); await P.perm(pg); showTemp(r.admin.name, r.admin.loginId, r.tempPassword); } catch (er) { MO.err(er); }
+        try { const r = await MO.api('adminSave', Object.assign(v, { photo: pk.value() })); await P.perm(pg); showTemp(r.admin.name, r.admin.loginId, r.tempPassword); } catch (er) { MO.err(er); }
         return;
       }
       const ed = e.target.closest('[data-edit]');
       if (ed) {
-        const a = d.admins.find(x => x.id === ed.dataset.edit);
-        const m = MO.modal({ title: `${a.name} 설정`, body: `<div style="display:grid;gap:12px"><label class="fld"><span>이름</span><input class="inp" id="aN" value="${esc(a.name)}"></label><label class="fld"><span>아이디</span><input class="inp" id="aL" value="${esc(a.loginId)}"></label><label class="fld"><span>역할</span><select class="inp" id="aR">${roles.map(r => `<option value="${r}" ${r === a.role ? 'selected' : ''}>${d.roles[r]}</option>`).join('')}</select></label><label class="check"><input type="checkbox" id="aA" ${a.active ? 'checked' : ''}> 사용 중 (끄면 바로 로그인할 수 없어요)</label></div>`,
-          foot: `<button class="btn r" data-v="del" style="margin-right:auto">${MO.icon('trash', 14)}삭제</button><button class="btn o" data-v="pw">${MO.icon('key', 14)}비밀번호 초기화</button><button class="btn" data-v="save">저장</button>` });
+        const a = d.admins.find(x => x.id === ed.dataset.edit), isM = a.role === 'master';
+        const color = isM ? '#3f3228' : RC[a.role][1], pk = A.photoPicker(a.name, color, a.photo);
+        const m = MO.modal({ title: `${a.name} 설정`, body: `<div style="display:grid;gap:12px" id="aBody"><div class="row2"><label class="fld"><span>이름</span><input class="inp" id="aN" value="${esc(a.name)}"></label><label class="fld"><span>아이디</span><input class="inp" id="aL" value="${esc(a.loginId)}" ${isM ? 'disabled' : ''}></label></div>
+            ${isM ? '<p class="note" style="margin:0">마스터 계정은 아이디·역할을 바꿀 수 없어요. 이름과 사진만 바꿀 수 있어요.</p>' : `<label class="fld"><span>역할</span><select class="inp" id="aR">${roles.map(r => `<option value="${r}" ${r === a.role ? 'selected' : ''}>${d.roles[r]}</option>`).join('')}</select></label><label class="check"><input type="checkbox" id="aA" ${a.active ? 'checked' : ''}> 이 계정 사용하기 <span class="note">(끄면 로그인할 수 없어요)</span></label>`}</div>`,
+          foot: `${isM ? '' : `<button class="btn r" data-v="del" style="margin-right:auto">${MO.icon('trash', 14)}삭제</button><button class="btn o" data-v="pw">${MO.icon('key', 14)}비밀번호 초기화</button>`}<button class="btn" data-v="save">저장</button>` });
+        m.body.querySelector('#aBody').prepend(pk.el);
         m.foot.onclick = async (ev) => {
           const b = ev.target.closest('[data-v]'); if (!b) return;
           try {
-            if (b.dataset.v === 'save') { await MO.api('adminSave', { id: a.id, name: m.body.querySelector('#aN').value, loginId: m.body.querySelector('#aL').value, role: m.body.querySelector('#aR').value, active: m.body.querySelector('#aA').checked }); m.close(); MO.toast('저장했어요', 'ok'); P.perm(pg); }
+            if (b.dataset.v === 'save') {
+              const body = { id: a.id, name: m.body.querySelector('#aN').value, photo: pk.value() };
+              if (!isM) Object.assign(body, { loginId: m.body.querySelector('#aL').value, role: m.body.querySelector('#aR').value, active: m.body.querySelector('#aA').checked });
+              await MO.api('adminSave', body); m.close(); MO.toast('저장했어요', 'ok');
+              if (a.id === A.st.me.id) { await A.refreshBoot(); A.reshell(); A.reload(); } else P.perm(pg);
+            }
             if (b.dataset.v === 'pw' && await MO.confirm(`${a.name}의 비밀번호를 초기화할까요? 임시 비밀번호가 새로 만들어져요.`, { ok: '초기화' })) { const r = await MO.api('adminResetPw', { id: a.id }); m.close(); await P.perm(pg); showTemp(a.name, a.loginId, r.tempPassword); }
             if (b.dataset.v === 'del' && await MO.confirm(`${a.name} 계정을 삭제할까요?`, { ok: '삭제', danger: true })) { await MO.api('adminDelete', { id: a.id }); m.close(); P.perm(pg); }
           } catch (er) { MO.err(er); }
