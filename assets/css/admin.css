@@ -266,3 +266,44 @@ button.ctile:hover .ced { opacity: 1; }
 .pav img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pav:hover { transform: scale(1.06); }
 .pav.on { box-shadow: 0 0 0 2.5px #fff, 0 0 0 5px var(--grn); }
+
+/* ===== 교적부 (모아온 스타일 · 양식 칸 구성) ===== */
+.sform { display: grid; gap: 12px; }
+.sform .fld > span small { font-weight: 600; }
+.pslots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.pslot { display: grid; justify-items: center; gap: 2px; text-align: center; }
+.pslot b { font-size: 13px; font-weight: 800; margin-top: 4px; }
+.pslot small { font-size: 11.5px; font-weight: 700; color: var(--c); background: var(--b); padding: 1px 8px; border-radius: 99px; }
+.pbox { position: relative; width: 100%; max-width: 104px; aspect-ratio: 3 / 4; border-radius: 16px; background: var(--b); border: 2px dashed color-mix(in srgb, var(--c) 45%, transparent); display: grid; place-items: center; overflow: hidden; }
+.pbox.has { border-style: solid; border-color: transparent; box-shadow: 0 4px 12px rgba(140, 100, 50, .12); }
+.pbox img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pbox .pnone { color: color-mix(in srgb, var(--c) 60%, #fff); }
+.pbox.has .pnone { display: none; }
+.pbox .pup { position: absolute; right: 6px; bottom: 6px; width: 30px; height: 30px; border-radius: 50%; background: #fff; color: var(--ink); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); cursor: pointer; z-index: 1; }
+.pbox .prm { position: absolute; right: 5px; top: 5px; width: 24px; height: 24px; border-radius: 50%; background: rgba(61, 49, 40, .75); color: #fff; font-size: 11px; display: grid; place-items: center; z-index: 1; }
+.fhead, .frow { display: grid; grid-template-columns: 1fr .7fr 1.15fr .85fr .9fr 1fr 40px; gap: 6px; align-items: center; }
+.fhead span { font-size: 11.5px; color: var(--sub); font-weight: 700; padding-left: 4px; }
+.frow .inp { padding: 9px 10px; font-size: 14px; }
+.lifeform { display: grid; gap: 10px; }
+.lgrp { border-radius: 16px; background: #fff; box-shadow: 0 3px 10px rgba(140, 100, 50, .06); overflow: hidden; }
+.lgh { display: flex; align-items: baseline; gap: 8px; padding: 8px 14px; background: var(--b); }
+.lgh b { color: var(--c); font-size: 14px; font-weight: 900; }
+.lgh span { font-size: 12px; color: var(--sub); font-weight: 700; }
+.lrow { display: grid; grid-template-columns: 74px .9fr .9fr 2.2fr auto; gap: 6px; align-items: center; padding: 6px 10px; border-top: 1px solid #f4ede2; }
+.lrow.cur { background: #fffbea; }
+.lrow .inp { padding: 8px 10px; font-size: 13.5px; }
+.lage { font-weight: 800; font-size: 13.5px; display: flex; align-items: center; gap: 4px; }
+.lage em, em.now { font-style: normal; font-size: 10.5px; font-weight: 800; color: #fff; background: var(--org); border-radius: 99px; padding: 1px 6px; }
+.tgls { display: flex; gap: 4px; }
+.tgl input { position: absolute; opacity: 0; pointer-events: none; }
+.tgl span { display: inline-block; padding: 6px 10px; border-radius: 99px; background: var(--soft); color: var(--sub); font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap; transition: background .12s, color .12s; }
+.tgl input:checked + span { background: var(--grn); color: #fff; }
+.tgl input:focus-visible + span { outline: 2px solid var(--yel); }
+.dchip { display: inline-block; font-size: 12px; font-weight: 800; color: var(--c); background: var(--b); padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+.lifet tr.cur td { background: #fffbea; }
+.okc { color: var(--grn-d); font-weight: 900; }
+@media (max-width: 860px) {
+  .pslots { grid-template-columns: repeat(5, minmax(56px, 1fr)); gap: 6px; }
+  .fhead { display: none; } .frow { grid-template-columns: 1fr 1fr; padding: 8px; background: #fff; border-radius: 14px; } .frow > button { justify-self: end; }
+  .lrow { grid-template-columns: 70px 1fr 1fr; } .lrow [data-l="note"] { grid-column: 1 / -1; } .lrow .tgls { grid-column: 1 / -1; }
+}

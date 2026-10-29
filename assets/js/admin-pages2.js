@@ -103,34 +103,36 @@
       const rate = s.attendance.length ? Math.round(s.attendance.filter(a => a.status).length / s.attendance.length * 100) : 0;
       box.innerHTML = `<div style="display:grid;gap:18px">
         <button class="btn o show-m" data-back="1" style="justify-self:start">‹ 목록으로</button>
-        <div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div class="photo" id="photo">${esc(s.name.slice(-2))}${canE ? `<label class="cam" title="사진 바꾸기">${MO.icon('cam', 18)}<input type="file" accept="image/*" hidden id="photoIn"></label>` : ''}</div>
+        <div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><div class="photo" id="photo">${esc(s.name.slice(-2))}</div>
           <div style="flex:1;min-width:180px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:27px;font-weight:900;letter-spacing:-.6px">${esc(s.name)}</b><span class="tag" style="--b:#fff3d6;--c:#a8621f;font-size:13px">${esc(A.clsLabel(s.classId))}</span>${s.status === '졸업' ? '<span class="tag">졸업</span>' : ''}</div>
-          <p style="margin:6px 0 0;font-size:14.5px;font-weight:700;color:#6d5d4f">${s.birth ? `${s.birth.replace(/-/g, '.')} (만 ${s.age}세)` : '생년월일 없음'} · 담임 ${t ? esc(t.name) : '-'}</p>${canE ? '<p class="note" style="margin:4px 0 0">카메라 버튼으로 사진을 바꿀 수 있어요</p>' : ''}</div>
+          <p style="margin:6px 0 0;font-size:14.5px;font-weight:700;color:#6d5d4f">${s.birth ? `${s.birth.replace(/-/g, '.')} (만 ${s.age}세)` : '생년월일 없음'} · 담임 ${t ? esc(t.name) : '-'}</p>
+          <p class="note" style="margin:4px 0 0">${s.consentDate ? '보호자 개인정보 동의 ' + s.consentDate.replace(/-/g, '.') + ' ✓' : '<span style="color:#cf5c45">보호자 개인정보 동의일을 넣어 주세요</span>'}</p></div>
           ${canE ? `<div class="acts" style="display:flex;gap:6px;align-self:flex-start"><button class="btn o" data-pin="1">${MO.icon('key', 15)}앱 비밀번호</button><button class="btn o" data-edit="1">${MO.icon('edit', 15)}수정</button></div>` : ''}</div>
         <div class="kpis" style="--n:3">${A.kpi(`${A.st.year}년 출석률`, rate + '<em>%</em>', `${s.attendance.filter(a => a.status).length} / ${s.attendance.length}주`, '#78a744')}${A.kpi('달란트', String(s.talent), '지금 가진 달란트', '#9a5530')}${A.kpi('말씀 암송', `${s.verses.learned} / ${s.verses.total}`, '진행 중인 계획 기준', '#d4863c')}</div>
-        <div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px" class="rgrid">
-        <div class="card"><div class="ch"><b>기본 정보</b><span>${s.consentDate ? '보호자 동의 ' + s.consentDate.replace(/-/g, '.') + ' ✓' : '<span style="color:#cf5c45">보호자 동의일을 넣어 주세요</span>'}</span></div>
-          <table class="t info"><tbody>${[['성별', s.gender || '-'], ['생년월일', s.birth ? `${s.birth.replace(/-/g, '.')} (만 ${s.age}세)` : '-'], ['보호자 1', s.guardian1 || '-'], ['보호자 2', s.guardian2 || '-'], ['주소', s.address || '-'], ['등록일', s.regDate ? s.regDate.replace(/-/g, '.') : '-']].map(([k, v]) => `<tr><td>${k}</td><td class="wrap"><b style="font-weight:700">${esc(v)}</b></td></tr>`).join('')}</tbody></table>
-          <div style="font-weight:900;font-size:14px;margin:16px 0 4px">가족 관계</div>
-          <div class="tscroll"><table class="t"><thead><tr><th>관계</th><th>이름</th><th>성별</th><th>소속 기관 · 직분</th></tr></thead><tbody>${s.family.length ? s.family.map(f => `<tr><td>${esc(f.rel)}</td><td>${esc(f.name)}</td><td>${esc(f.gender)}</td><td class="wrap">${esc(f.org)}</td></tr>`).join('') : '<tr><td colspan="4" class="note">아직 없어요</td></tr>'}</tbody></table></div>
-          <div style="font-weight:900;font-size:14px;margin:16px 0 4px">이전 기관 담임</div>
-          <table class="t"><tbody>${s.prevTeachers.length ? s.prevTeachers.map(p => `<tr><td class="note" style="width:96px">${esc(p.year)}</td><td class="wrap">${esc(p.org)}</td><td class="r"><b>${esc(p.teacher)}</b></td></tr>`).join('') : '<tr><td class="note">아직 없어요</td></tr>'}</tbody></table></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;align-items:start" class="rgrid">
+        <div class="card"><div class="ch"><b>기본 정보</b></div>
+          <table class="t info"><tbody>${RS.infoRows(s).map(([k, v]) => `<tr><td>${k}</td><td class="wrap"><b style="font-weight:700">${esc(v)}</b></td></tr>`).join('')}</tbody></table>
+          <div style="font-weight:900;font-size:14px;margin:16px 0 4px">가족 사항</div>${RS.familyTable(s)}</div>
+        <div style="display:grid;gap:18px">
+        <div class="card"><div class="ch"><b>시기별 사진</b>${canE ? '<span>카메라 버튼으로 바로 올려요</span>' : ''}</div>${RS.photos(s, { canPhoto: canE })}</div>
         <div class="card"><div class="ch"><b>기타 (요청 · 특이사항)</b><span>${s.notes.length}건</span></div>
-          <div class="list">${s.notes.map(n => `<div class="li" style="align-items:flex-start"><span class="tag" style="${n.type === '요청' ? '--b:#e6f0fa;--c:#3d7cb8' : '--b:#fde8e1;--c:#cf5c45'};flex:none">${n.type}</span><div><b style="font-size:13.5px;font-weight:700;white-space:normal">${esc(n.text)}</b><span>${n.date.replace(/-/g, '.')} · ${esc(n.by)}</span></div>${canE ? `<button class="btn o sm" data-delnote="${n.id}" aria-label="지우기">${MO.icon('trash', 13)}</button>` : ''}</div>`).join('') || '<p class="note" style="margin:0">아직 없어요</p>'}</div>
-          ${canE ? `<form id="noteF" style="display:grid;gap:8px;margin-top:12px"><div style="display:flex;gap:6px"><select class="inp" id="noteT" style="width:auto"><option>특이사항</option><option>요청</option></select><input class="inp" id="noteX" placeholder="요청이나 특이사항을 적어 주세요" maxlength="300"></div><button class="btn" type="submit">추가</button></form>` : ''}</div></div>
+          <div class="list">${s.notes.map(n => `<div class="li" style="align-items:flex-start"><span class="tag" style="${n.type === '요청' ? '--b:#e6f0fa;--c:#3d7cb8' : '--b:#fde8e1;--c:#cf5c45'};flex:none">${esc(n.type)}</span><div><b style="font-size:13.5px;font-weight:700;white-space:normal">${esc(n.text)}</b><span>${n.date.replace(/-/g, '.')} · ${esc(n.by)}</span></div>${canE ? `<button class="btn o sm" data-delnote="${n.id}" aria-label="지우기">${MO.icon('trash', 13)}</button>` : ''}</div>`).join('') || '<p class="note" style="margin:0">아직 없어요</p>'}</div>
+          ${canE ? `<form id="noteF" style="display:grid;gap:8px;margin-top:12px"><div style="display:flex;gap:6px"><select class="inp" id="noteT" style="width:auto"><option>특이사항</option><option>요청</option></select><input class="inp" id="noteX" placeholder="요청이나 특이사항을 적어 주세요" maxlength="300"></div><button class="btn" type="submit">추가</button></form>` : ''}</div></div></div>
+        <div class="card"><div class="ch"><b>생활 기록부</b><span>연령별 반 · 담임 · 전달 사항</span></div>${RS.lifeList(s)}</div>
         <div class="card"><div class="ch"><b>${A.st.year}년 출석 기록</b><span>${s.attendance.filter(a => a.status).length}회 출석 · ${s.attendance.length}주 기록</span></div>
-          ${s.attendance.length ? `<div class="strip">${s.attendance.map(a => `<span class="${a.status ? 'y' : ''}" title="${MO.md(a.date)} ${a.status ? '출석' : '결석'}"></span>`).join('')}</div><div style="display:flex;justify-content:space-between;margin-top:6px" class="note"><span>${MO.md(s.attendance[0].date)}</span><span>${MO.md(s.attendance[s.attendance.length - 1].date)}</span></div>` : '<p class="note" style="margin:0">아직 기록이 없어요</p>'}</div></div>`;
+          ${s.attendance.length ? `<div class="strip">${s.attendance.map(a => `<span class="${a.status ? 'y' : ''}" title="${MO.md(a.date)} ${a.status ? '출석' : '결석'}"></span>`).join('')}</div><div style="display:flex;justify-content:space-between;margin-top:6px" class="note"><span>${MO.md(s.attendance[0].date)}</span><span>${MO.md(s.attendance[s.attendance.length - 1].date)}</span></div>` : '<p class="note" style="margin:0">아직 기록이 없어요</p>'}</div></div></div>`;
       const g = box.querySelector('.rgrid'); if (innerWidth < 1180) g.style.gridTemplateColumns = '1fr';
       if (s.photoId) MO.api('studentPhotoGet', { id: s.id }, { loader: false }).then(url => { if (url && rosSel === s.id) { const ph = box.querySelector('#photo'); const im = document.createElement('img'); im.src = url; im.alt = s.name + ' 사진'; ph.firstChild.replaceWith(im); } }).catch(() => {});
-      const pin = box.querySelector('#photoIn');
-      if (pin) pin.onchange = async () => {
-        const f = pin.files[0]; if (!f) return;
-        try { const data = await MO.resizeImage(f, 480, .85); await MO.api('studentPhoto', { id: s.id, data }); MO.toast('사진을 바꿨어요', 'ok'); showDetail(s.id); } catch (er) { MO.err(er); }
-      };
+      RS.fillPhotos(box, s);
+      box.querySelectorAll('[data-up]').forEach(inp => inp.onchange = async () => {
+        const f = inp.files[0]; if (!f) return;
+        try { const data = await MO.resizeImage(f, 600, .85); await MO.api('studentPhoto', { id: s.id, slot: inp.dataset.up, data }); MO.toast(`${inp.dataset.up} 사진을 올렸어요`, 'ok'); await A.refreshBoot(); showDetail(s.id); } catch (er) { MO.err(er); }
+      });
       const nf = box.querySelector('#noteF');
       if (nf) nf.onsubmit = async (ev) => { ev.preventDefault(); const text = box.querySelector('#noteX').value.trim(); if (!text) return; try { await MO.api('noteAdd', { studentId: s.id, type: box.querySelector('#noteT').value, text }); showDetail(s.id); } catch (er) { MO.err(er); } };
       box.onclick = async (ev) => {
         if (ev.target.closest('[data-back]')) { rosSel = ''; pg.querySelector('#rosWrap').classList.remove('detail'); drawList(); return; }
+        const rp = ev.target.closest('[data-rmph]'); if (rp) { if (await MO.confirm(`${rp.dataset.rmph} 사진을 뺄까요?`, { ok: '빼기', danger: true })) { try { await MO.api('studentPhoto', { id: s.id, slot: rp.dataset.rmph, data: '' }); await A.refreshBoot(); showDetail(s.id); } catch (er) { MO.err(er); } } return; }
         const dn = ev.target.closest('[data-delnote]'); if (dn && await MO.confirm('이 메모를 지울까요?', { ok: '지우기', danger: true })) { try { await MO.api('noteDelete', { id: dn.dataset.delnote }); showDetail(s.id); } catch (er) { MO.err(er); } return; }
         if (ev.target.closest('[data-edit]')) { if (await studentForm(s)) { await A.refreshBoot(); showDetail(s.id); } return; }
         if (ev.target.closest('[data-pin]')) {
@@ -142,32 +144,37 @@
     };
     const studentForm = (s) => new Promise((res) => {
       const isNew = !s;
-      s = s ? JSON.parse(JSON.stringify(s)) : { name: '', gender: '', birth: '', classId: (A.activeClasses()[0] || {}).id || '', status: '재적', guardian1: '', guardian2: '', address: '', family: [], prevTeachers: [], consentDate: '', regDate: A.st.boot.today };
-      const body = document.createElement('div'); body.style.cssText = 'display:grid;gap:12px';
-      const inp = (k, label, type = 'text', ph = '') => `<label class="fld"><span>${label}</span><input class="inp" data-k="${k}" type="${type}" value="${esc(s[k] || '')}" placeholder="${ph}"></label>`;
-      const sync = () => { body.querySelectorAll('[data-k]').forEach(el => { s[el.dataset.k] = el.value; }); body.querySelectorAll('[data-fam]').forEach(el => { const [i, k] = el.dataset.fam.split('|'); s.family[+i][k] = el.value; }); body.querySelectorAll('[data-prev]').forEach(el => { const [i, k] = el.dataset.prev.split('|'); s.prevTeachers[+i][k] = el.value; }); };
+      s = s ? JSON.parse(JSON.stringify(s)) : { name: '', gender: '', birth: '', classId: (A.activeClasses()[0] || {}).id || '', status: '재적', address: '', family: [], life: {}, consentDate: '', regDate: A.st.boot.today, phone: '', parentPhone: '', school: '', leader: '', baptismDate: '', photoSlots: [] };
+      if (!s.parentPhone && (s.guardian1 || s.guardian2)) s.parentPhone = [s.guardian1, s.guardian2].filter(Boolean).join(' / ').slice(0, 40); // 예전 보호자 칸 옮기기
+      s.photoSlots = s.photoSlots || [];
+      const pending = {}; // 시기별 사진: data(올리기) 또는 ''(빼기)
+      const body = document.createElement('div');
+      const keep = () => RS.read(body, s);
       const paint = () => {
-        body.innerHTML = `<div class="row2">${inp('name', '이름 *', 'text', '예: 김하준')}<label class="fld"><span>반</span><select class="inp" data-k="classId">${A.st.boot.classes.map(c => `<option value="${c.id}" ${c.id === s.classId ? 'selected' : ''}>${c.grade}학년 ${esc(c.name)}</option>`).join('')}</select></label></div>
-          <div class="row3"><label class="fld"><span>성별</span><select class="inp" data-k="gender">${['', '남', '여'].map(g => `<option ${g === s.gender ? 'selected' : ''} value="${g}">${g || '선택'}</option>`).join('')}</select></label>${inp('birth', '생년월일', 'date')}<label class="fld"><span>상태</span><select class="inp" data-k="status">${['재적', '졸업'].map(g => `<option ${g === s.status ? 'selected' : ''}>${g}</option>`).join('')}</select></label></div>
-          <div class="row2">${inp('guardian1', '보호자 1', 'text', '예: 김○○ (부) · 010-0000-0000')}${inp('guardian2', '보호자 2', 'text', '예: 이○○ (모) · 010-0000-0000')}</div>
-          ${inp('address', '주소')}
-          <div class="row2">${inp('consentDate', '보호자 개인정보 동의일', 'date')}${inp('regDate', '등록일', 'date')}</div>
-          ${isNew ? `<label class="fld"><span>아이 앱 비밀번호 (숫자 4자리)</span><input class="inp" data-k="pin" type="tel" maxlength="4" value="${esc(s.pin || '')}" placeholder="비워 두면 생일 월일(예: 0512)"></label>` : ''}
-          <div class="fld"><span>가족 관계</span>${s.family.map((f, i) => `<div style="display:grid;grid-template-columns:70px 1fr 64px 1.3fr 36px;gap:6px"><input class="inp" data-fam="${i}|rel" value="${esc(f.rel)}" placeholder="관계"><input class="inp" data-fam="${i}|name" value="${esc(f.name)}" placeholder="이름"><input class="inp" data-fam="${i}|gender" value="${esc(f.gender)}" placeholder="성별"><input class="inp" data-fam="${i}|org" value="${esc(f.org)}" placeholder="소속 기관 · 직분"><button type="button" class="btn o" data-rmf="${i}" aria-label="빼기">✕</button></div>`).join('')}<button type="button" class="btn o sm" id="addF" style="justify-self:start">${MO.icon('plus', 13)}가족 추가</button></div>
-          <div class="fld"><span>이전 기관 담임</span>${s.prevTeachers.map((p, i) => `<div style="display:grid;grid-template-columns:100px 1fr 110px 36px;gap:6px"><input class="inp" data-prev="${i}|year" value="${esc(p.year)}" placeholder="연도"><input class="inp" data-prev="${i}|org" value="${esc(p.org)}" placeholder="기관 (예: 유년부)"><input class="inp" data-prev="${i}|teacher" value="${esc(p.teacher)}" placeholder="담임"><button type="button" class="btn o" data-rmp="${i}" aria-label="빼기">✕</button></div>`).join('')}<button type="button" class="btn o sm" id="addP" style="justify-self:start">${MO.icon('plus', 13)}이전 담임 추가</button></div>`;
+        body.innerHTML = RS.form(s, { isNew }); RS.fillPhotos(body, s, pending);
+        body.querySelectorAll('[data-up]').forEach(inp => inp.onchange = async () => {
+          const f = inp.files[0]; if (!f) return;
+          try { keep(); pending[inp.dataset.up] = await MO.resizeImage(f, 600, .85); if (!s.photoSlots.includes(inp.dataset.up)) s.photoSlots.push(inp.dataset.up); paint(); } catch (er) { MO.err(er); }
+        });
       };
       paint();
-      body.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; sync();
-        if (b.id === 'addF') s.family.push({ rel: '', name: '', gender: '', org: '' }); else if (b.id === 'addP') s.prevTeachers.push({ year: '', org: '', teacher: '' });
-        else if (b.dataset.rmf != null) s.family.splice(+b.dataset.rmf, 1); else if (b.dataset.rmp != null) s.prevTeachers.splice(+b.dataset.rmp, 1); else return; paint(); };
+      body.onclick = (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        if (b.dataset.addfam) { keep(); s.family.push({}); paint(); return; }
+        if (b.dataset.rmf != null) { keep(); s.family.splice(+b.dataset.rmf, 1); paint(); return; }
+        if (b.dataset.rmph) { keep(); pending[b.dataset.rmph] = ''; s.photoSlots = s.photoSlots.filter(x => x !== b.dataset.rmph); paint(); }
+      };
       const m = MO.modal({ title: isNew ? '새 학생 등록' : `${s.name} 정보 수정`, wide: true, body, foot: `<button class="btn o" data-v="0">취소</button><button class="btn" data-v="1">저장</button>`, onClose: () => res(false) });
       m.foot.onclick = async (e) => {
         const b = e.target.closest('[data-v]'); if (!b) return; if (b.dataset.v === '0') { m.el.remove(); return res(false); }
-        sync(); if (!s.name.trim()) return MO.toast('이름을 입력해 주세요', 'err');
+        keep(); if (!s.name) return MO.toast('이름을 입력해 주세요', 'err');
         if (s.pin && !/^\d{4}$/.test(s.pin)) return MO.toast('앱 비밀번호는 숫자 4자리예요', 'err');
-        s.family = s.family.filter(f => f.rel || f.name); s.prevTeachers = s.prevTeachers.filter(p => p.org || p.teacher);
+        s.family = s.family.filter(f => f.name || f.rel);
         try {
-          const r = await MO.api('studentSave', s); m.el.remove();
+          const r = await MO.api('studentSave', s);
+          const sid = r.id || s.id;
+          for (const slot of Object.keys(pending)) await MO.api('studentPhoto', { id: sid, slot, data: pending[slot] });
+          m.el.remove();
           if (isNew) { await MO.alert('등록했어요', `<p style="margin:0;font-weight:700">${esc(r.name)} · ${esc(A.clsLabel(r.classId))}</p><p style="margin:8px 0 0">아이 앱 첫 비밀번호: <b style="font-size:24px;color:var(--mane)">${r.initialPin}</b></p><p class="note">아이에게 알려 주세요. 교적부에서 언제든 바꿀 수 있어요.</p>`); rosSel = r.id; }
           else MO.toast('저장했어요', 'ok');
           res(true);

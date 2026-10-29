@@ -335,7 +335,7 @@
     const m = MO.modal({
       title: '교적부 엑셀로 받기',
       body: `<div class="fld"><span>범위</span><div class="chips" id="xg"><button class="chip on" data-g="">전체</button>${grades.map(g => `<button class="chip" data-g="${g}">${g}학년</button>`).join('')}</div></div>
-        <label class="check"><input type="checkbox" id="xCard" checked style="width:18px;height:18px;accent-color:var(--grn)">한 명씩 교적부 양식 시트 넣기 (인쇄용 A4)</label>
+        <label class="check"><input type="checkbox" id="xCard" checked style="width:18px;height:18px;accent-color:var(--grn)">한 명씩 교적부 양식 넣기 (사무엘 교회 학교 교적부 · A4 가로 1장)</label>
         <label class="check"><input type="checkbox" id="xPhoto" checked style="width:18px;height:18px;accent-color:var(--grn)">사진 넣기 <span class="note">(사진이 많으면 조금 걸려요)</span></label>
         <label class="check"><input type="checkbox" id="xGrad" style="width:18px;height:18px;accent-color:var(--grn)">졸업한 아이도 넣기</label>
         <p class="note" style="margin:0">교적부에는 개인정보가 들어 있어요. 받은 파일은 공유하지 말고 안전한 곳에 보관해 주세요.</p>`,
@@ -361,14 +361,14 @@
     const photos = {};
     if (o.cards && o.photos) {
       const ids = studs.filter(s => s.hasPhoto).map(s => s.id);
-      for (let i = 0; i < ids.length; i += 15) Object.assign(photos, await MO.api('studentPhotos', { ids: ids.slice(i, i + 15) }, { loader: false }));
+      for (let i = 0; i < ids.length; i += 10) Object.assign(photos, await MO.api('studentPhotos', { ids: ids.slice(i, i + 10), slots: true }, { loader: false }));
     }
     const attRate = (s) => { const n = s.attendance.length; return n ? s.attendance.filter(a => a.status === 1).length / n : ''; };
     const wb = XL.book(); wb.title = '교적부';
     // 목록
     const ws = wb.sheet('교적부 목록', { landscape: 1, freeze: { row: 4, col: 4 }, printRows: [4, 4], tab: ACC.ros });
     const byG = {}; studs.forEach(s => { byG[s.grade || '-'] = (byG[s.grade || '-'] || 0) + 1; });
-    let r = head(ws, `${o.grade ? o.grade + '학년 ' : ''}교적부 목록`, `총 ${studs.length}명 (${Object.keys(byG).map(k => `${k}학년 ${byG[k]}명`).join(', ')}) · ${year}년 출석 기준`, 17);
+    let r = head(ws, `${o.grade ? o.grade + '학년 ' : ''}교적부 목록`, `총 ${studs.length}명 (${Object.keys(byG).map(k => `${k}학년 ${byG[k]}명`).join(', ')}) · ${year}년 출석 기준`, 20);
     const t = table(ws, r, [
       { t: '번호', w: 5, v: (s, i) => i + 1, s: { h: 'center', color: C.sub } },
       { t: '학년', w: 6, v: s => s.grade ? s.grade + '학년' : '', s: { h: 'center' } },
@@ -378,89 +378,80 @@
       { t: '생년월일', w: 11, v: s => ymd(s.birth), s: { h: 'center' } },
       { t: '만 나이', w: 6.5, v: s => s.birth ? s.age : '', s: { h: 'center', fmt: '0"세"' } },
       { t: '담임', w: 8, v: s => s.teacher, s: { h: 'center' } },
-      { t: '보호자 1', w: 22, v: s => s.guardian1 || '', s: { wrap: 1, indent: 1 } },
-      { t: '보호자 2', w: 22, v: s => s.guardian2 || '', s: { wrap: 1, indent: 1 } },
-      { t: '주소', w: 30, v: s => s.address || '', s: { wrap: 1, indent: 1 } },
+      { t: '연락처(학생)', w: 14, v: s => s.phone || '', s: { h: 'center' } },
+      { t: '연락처(학부모)', w: 20, v: s => s.parentPhone || [s.guardian1, s.guardian2].filter(Boolean).join(' / '), s: { wrap: 1, indent: 1 } },
+      { t: '학교', w: 13, v: s => s.school || '', s: { h: 'center' } },
+      { t: '주소', w: 28, v: s => s.address || '', s: { wrap: 1, indent: 1 } },
+      { t: '인도자', w: 8, v: s => s.leader || '', s: { h: 'center' } },
+      { t: '세례일', w: 11, v: s => ymd(s.baptismDate), s: { h: 'center' } },
       { t: '등록일', w: 11, v: s => ymd(s.regDate), s: { h: 'center' } },
       { t: '동의일', w: 11, v: s => ymd(s.consentDate), s: (s) => ({ h: 'center', color: s.consentDate ? C.ink : C.red }) },
       { t: '상태', w: 6, v: s => s.status || '재적', s: (s) => ({ h: 'center', color: s.status === '졸업' ? C.sub : C.ink }) },
       { t: `${year} 출석률`, w: 8.5, v: s => attRate(s), s: { h: 'center', fmt: PCT, b: 1 } },
       { t: '달란트', w: 7, v: s => s.talent, s: { h: 'center', fmt: NUM } },
       { t: '암송', w: 7, v: s => d.verseTotal ? `${s.versesLearned}/${d.verseTotal}` : '', s: { h: 'center' } }
-    ], studs, ACC.ros, { rowH: (s) => Math.max(22, Math.max(lines(s.address, 30), lines(s.guardian1, 22), lines(s.guardian2, 22)) * 14 + 8), headH: 26 });
-    ws.o.filter = XL.rng(t.r0, 1, t.dataEnd, 17);
+    ], studs, ACC.ros, { rowH: (s) => Math.max(22, Math.max(lines(s.address, 28), lines(s.parentPhone || [s.guardian1, s.guardian2].filter(Boolean).join(' / '), 20)) * 14 + 8), headH: 26 });
+    ws.o.filter = XL.rng(t.r0, 1, t.dataEnd, 20);
     // 한 명씩 교적부
     if (o.cards) for (const s of studs) await card(wb, s, d, photos[s.id]);
     save(wb, `MOAON_Roster_${today()}.xlsx`);
   });
 
-  /** 개인 교적부 (A4 세로 1장) */
-  async function card(wb, s, d, photo) {
-    const acc = ACC.ros, year = d.year;
-    const ws = wb.sheet(`${s.grade || ''}${s.className ? s.className.replace(/반$/, '') : ''}_${s.name}`, { onePage: 1, margins: [0.5, 0.5, 0.5, 0.5], tab: 'C9A27E' });
-    const W = [11, 12, 9, 12, 9, 11, 9.5, 10]; ws.cols(W);
-    const L = (o2) => Object.assign({ b: 1, sz: 9.5, color: '6B4E36', fill: 'F6EEE2', h: 'center', border: 'all', bc: 'CDBDA6' }, o2 || {});
-    const V = (o2) => Object.assign({ sz: 10, border: 'all', bc: 'CDBDA6', indent: 1 }, o2 || {});
-    const H = (o2) => Object.assign({ b: 1, sz: 9.5, color: 'FFFFFF', fill: acc, h: 'center', border: 'all', bc: acc }, o2 || {});
-    const sec = (r, text) => { ws.merge(r, 1, r, 8, text, S.sec(acc)); ws.height(r, 24); };
-    ws.merge(1, 1, 1, 8, '교  적  부', { b: 1, sz: 22, color: C.ink, h: 'center' }); ws.height(1, 44);
-    ws.merge(2, 1, 2, 8, `${d.org}  ·  ${year}년  ·  출력 ${ymd(d.today)}`, { sz: 9, color: C.sub, h: 'center' }); ws.height(2, 18);
-    ws.height(3, 10);
-    sec(4, '기본 사항');
-    // 사진 칸 (G5:H10)
-    ws.merge(5, 7, 10, 8, photo ? '' : '사 진', { sz: 10, color: 'B5A58F', h: 'center', border: 'all', bc: 'CDBDA6', fill: photo ? undefined : 'FBF7F0' });
-    const pair = (r, l1, v1, l2, v2, o2) => { ws.set(r, 1, l1, L()); ws.merge(r, 2, r, 3, v1, V(o2 && o2.v1)); ws.set(r, 4, l2, L()); ws.merge(r, 5, r, 6, v2, V(o2 && o2.v2)); ws.height(r, 26); };
-    pair(5, '이  름', s.name, '성  별', s.gender || '', { v1: { b: 1, sz: 12 } });
-    pair(6, '생년월일', ymd(s.birth), '만 나이', s.birth ? `${s.age}세` : '');
-    pair(7, '학년 · 반', s.grade ? `${s.grade}학년 ${s.className}` : '반 없음', '담  임', s.teacher + (s.assistant ? ` (보조 ${s.assistant})` : ''));
-    pair(8, '등록일', ymd(s.regDate), '상  태', s.status || '재적');
-    ws.set(9, 1, '보호자 1', L()); ws.merge(9, 2, 9, 6, s.guardian1 || '', V()); ws.height(9, 26);
-    ws.set(10, 1, '보호자 2', L()); ws.merge(10, 2, 10, 6, s.guardian2 || '', V()); ws.height(10, 26);
-    ws.set(11, 1, '주  소', L()); ws.merge(11, 2, 11, 8, s.address || '', V({ wrap: 1 })); ws.height(11, Math.max(26, lines(s.address, 70) * 14 + 10));
-    ws.set(12, 1, '동의일', L()); ws.merge(12, 2, 12, 3, ymd(s.consentDate) || '미동의', V({ color: s.consentDate ? C.ink : C.red })); ws.set(12, 4, '달란트', L()); ws.merge(12, 5, 12, 6, `${s.talent} T`, V()); ws.set(12, 7, '암송', L()); ws.set(12, 8, d.verseTotal ? `${s.versesLearned}/${d.verseTotal}` : '-', V({ h: 'center', indent: 0 })); ws.height(12, 26);
-    if (photo) {
-      const url = await toJpeg(photo);
-      if (url) {
-        const boxW = Math.round((W[6] + W[7]) * 7 + 10), boxH = Math.round((26 * 6) * 96 / 72);
-        const [iw, ih] = await imgSize(url), k = Math.min((boxW - 8) / iw, (boxH - 8) / ih), w = Math.round(iw * k), h = Math.round(ih * k);
-        ws.image(url, { r: 5, c: 7, dx: Math.round((boxW - w) / 2), dy: Math.round((boxH - h) / 2), w, h });
-      }
+  /** 개인 교적부 — 사무엘 교회 학교 교적부 양식 그대로 (A4 가로 1장) */
+  const JK = [
+    { k: '영아부', c: 'FFFF00', stages: ['1세', '2세', '3세', '4세'], slot: '4세', label: '사진\n(4세)', c1: 1, c2: 1 },
+    { k: '유치부', c: 'C2F1C8', stages: ['5세', '6세', '7세'], slot: '7세', label: '사진\n(7세)', c1: 2, c2: 3 },
+    { k: '유년부', c: 'FBE3D6', stages: ['1학년', '2학년'], slot: '2학년', label: '사진\n(2학년)', c1: 4, c2: 5 },
+    { k: '초등부', c: 'F2CFEE', stages: ['3학년', '4학년'], slot: '4학년', label: '사진\n(4학년)', c1: 6, c2: 6 },
+    { k: '소년부', c: 'B4E5A2', stages: ['5학년', '6학년'], slot: '6학년', label: '사진\n(6학년)', c1: 7, c2: 11 }
+  ];
+  async function card(wb, s, d, photos) {
+    photos = photos && typeof photos === 'object' ? photos : {};
+    const ws = wb.sheet(`${s.grade || ''}${s.className ? s.className.replace(/반$/, '') : ''}_${s.name}`, { landscape: 1, onePage: 1, margins: [0.35, 0.35, 0.4, 0.4], tab: 'C1E5F5', footer: `${d.org} · 출력 ${ymd(d.today)}` });
+    const W = [28.2, 15, 13.1, 11.4, 17.5, 31.9, 10.2, 2, 7, 7, 8]; ws.cols(W);
+    const F = '맑은 고딕', BC = '000000';
+    const box = (o) => Object.assign({ font: F, sz: 12, border: 'all', bc: BC, h: 'center', v: 'center' }, o || {});
+    const L = (o) => box(Object.assign({ b: 1, sz: 13 }, o));             // 항목 이름 칸
+    const V = (o) => box(Object.assign({ h: 'left', indent: 1, wrap: 1 }, o)); // 값 칸
+    // 1. 제목
+    ws.merge(1, 1, 1, 11, '사무엘 교회 학교 교적부', box({ b: 1, sz: 18, fill: 'C1E5F5', border: 'medium' })); ws.height(1, 30);
+    // 2~3. 부서 + 사진
+    JK.forEach(j => { ws.merge(2, j.c1, 2, j.c2, j.k, box({ sz: 13, fill: j.c })); ws.merge(3, j.c1, 3, j.c2, photos[j.slot] ? '' : j.label, box({ sz: 14, wrap: 1, color: '7F7F7F' })); });
+    ws.height(2, 26); ws.height(3, 160);
+    const px = (c1, c2) => W.slice(c1 - 1, c2).reduce((a, w) => a + Math.round(w * 7 + 5), 0);
+    for (const j of JK) {
+      const u = photos[j.slot] && await toJpeg(photos[j.slot]); if (!u) continue;
+      const bw = px(j.c1, j.c2), bh = Math.round(160 * 96 / 72), [iw, ih] = await imgSize(u), k = Math.min((bw - 10) / iw, (bh - 10) / ih), w = Math.round(iw * k), h = Math.round(ih * k);
+      ws.image(u, { r: 3, c: j.c1, dx: Math.round((bw - w) / 2), dy: Math.round((bh - h) / 2), w, h });
     }
-    let r = 13; ws.height(r, 10); r++;
-    // 가족 관계
-    sec(r, '가족 관계'); r++;
-    ws.set(r, 1, '관계', H()); ws.merge(r, 2, r, 3, '이름', H()); ws.set(r, 4, '성별', H()); ws.merge(r, 5, r, 8, '소속 기관 · 직분', H()); ws.height(r, 22); r++;
-    const fam = s.family && s.family.length ? s.family : [];
-    for (let i = 0; i < Math.max(fam.length, 3); i++) { const f = fam[i] || {}; ws.set(r, 1, f.rel || '', V({ h: 'center', indent: 0 })); ws.merge(r, 2, r, 3, f.name || '', V()); ws.set(r, 4, f.gender || '', V({ h: 'center', indent: 0 })); ws.merge(r, 5, r, 8, f.org || '', V()); ws.height(r, 23); r++; }
-    ws.height(r, 10); r++;
-    // 이전 기관 담임
-    sec(r, '이전 기관 담임'); r++;
-    ws.set(r, 1, '연도', H()); ws.merge(r, 2, r, 5, '기관', H()); ws.merge(r, 6, r, 8, '담임', H()); ws.height(r, 22); r++;
-    const pv = s.prevTeachers && s.prevTeachers.length ? s.prevTeachers : [];
-    for (let i = 0; i < Math.max(pv.length, 2); i++) { const p = pv[i] || {}; ws.set(r, 1, p.year || '', V({ h: 'center', indent: 0 })); ws.merge(r, 2, r, 5, p.org || '', V()); ws.merge(r, 6, r, 8, p.teacher || '', V({ h: 'center', indent: 0 })); ws.height(r, 23); r++; }
-    ws.height(r, 10); r++;
-    // 출석 기록 (월별 출석/주일)
-    const att = s.attendance, P = att.filter(a => a.status === 1).length;
-    sec(r, `${year}년 출석 기록   ·   출석 ${P}회 / 기록 ${att.length}회   ·   출석률 ${att.length ? Math.round(P / att.length * 100) : 0}%`); r++;
-    const mv = (m) => { const xs = att.filter(a => Number(a.date.slice(5, 7)) === m); return xs.length ? `${xs.filter(a => a.status === 1).length}/${xs.length}` : '-'; };
-    const half = (a, b) => { const xs = att.filter(x => { const m = Number(x.date.slice(5, 7)); return m >= a && m <= b; }); return xs.length ? `${xs.filter(x => x.status === 1).length}/${xs.length}` : '-'; };
-    [[1, 6, '상반기'], [7, 12, '하반기']].forEach(([a, b, lab]) => {
-      ws.set(r, 1, '월', H()); for (let m = a; m <= b; m++) ws.set(r, 2 + m - a, m + '월', H()); ws.set(r, 8, lab, H()); ws.height(r, 20); r++;
-      ws.set(r, 1, '출석/주일', L({ sz: 8.5 })); for (let m = a; m <= b; m++) ws.set(r, 2 + m - a, mv(m), V({ h: 'center', indent: 0 })); ws.set(r, 8, half(a, b), V({ h: 'center', indent: 0, b: 1 })); ws.height(r, 23); r++;
+    // 4~7. 기본 사항
+    const row = (r, l1, v1, l2, v2, l3, v3) => { ws.set(r, 1, l1, L()); ws.merge(r, 2, r, 4, v1, V()); ws.set(r, 5, l2, L()); ws.set(r, 6, v2, V()); ws.set(r, 7, l3, L()); ws.merge(r, 8, r, 11, v3, V({ sz: 11 })); ws.height(r, 28); };
+    row(4, '이             름', s.name, '성     별', s.gender || '', '등록일', ymd(s.regDate));
+    row(5, '연락처(학   생)', s.phone || '', '생년월일', s.birth ? `${ymd(s.birth)} (만 ${s.age}세)` : '', '인도자', s.leader || '');
+    row(6, '연락처(학부모)', s.parentPhone || [s.guardian1, s.guardian2].filter(Boolean).join(' / '), '학     교', s.school || '', '세례일', ymd(s.baptismDate));
+    ws.set(7, 1, '주              소', L()); ws.merge(7, 2, 7, 11, s.address || '', V()); ws.height(7, 28);
+    // 8~. 가족사항
+    const fam = (s.family || []).slice(); while (fam.length < 5) fam.push({});
+    const f0 = 8, fEnd = f0 + fam.length;
+    ws.merge(f0, 1, fEnd, 1, '가\n족\n사\n항', L({ wrap: 1 }));
+    ws.set(f0, 2, '이름', L()); ws.set(f0, 3, '관계', L()); ws.merge(f0, 4, f0, 5, '생년월일', L()); ws.set(f0, 6, '출석 유/무', L()); ws.set(f0, 7, '직분', L()); ws.merge(f0, 8, f0, 11, '비고', L()); ws.height(f0, 26);
+    fam.forEach((f, i) => { const r = f0 + 1 + i; ws.set(r, 2, f.name || '', box()); ws.set(r, 3, f.rel || '', box()); ws.merge(r, 4, r, 5, ymd(f.birth || ''), box()); ws.set(r, 6, f.attend || '', box()); ws.set(r, 7, f.role || '', box({ sz: 11, wrap: 1 })); ws.merge(r, 8, r, 11, f.note || '', V({ sz: 11 })); ws.height(r, 26); });
+    // 생활 기록부
+    let r = fEnd + 1; ws.height(r, 10); r++;
+    ws.merge(r, 1, r, 8, '생활 기록부', box({ sz: 12, fill: '83CBEB' })); ws.merge(r, 9, r + 1, 9, '개근', box({ sz: 11, fill: '5B9BD5', color: 'FFFFFF' })); ws.merge(r, 10, r + 1, 10, '정근', box({ sz: 11, fill: 'F8CBAD' })); ws.merge(r, 11, r + 1, 11, '구속사', box({ sz: 10, fill: 'F8CBAD' })); ws.height(r, 24); r++;
+    ws.set(r, 1, '구분', L()); ws.set(r, 2, '연령', box({ sz: 13 })); ws.set(r, 3, '반', box({ sz: 13 })); ws.set(r, 4, '담임', box({ sz: 13 })); ws.merge(r, 5, r, 8, '전달 사항', box({ sz: 13 })); ws.height(r, 24); r++;
+    const life = s.life || {}, cur = s.grade ? s.grade + '학년' : '';
+    JK.forEach(j => {
+      ws.merge(r, 1, r + j.stages.length - 1, 1, j.k, L({ fill: j.c }));
+      j.stages.forEach((st, i) => {
+        const x = life[st] || {}, isCur = st === cur && s.status !== '졸업';
+        const cls = x.cls || (isCur ? s.className : ''), tch = x.teacher || (isCur ? s.teacher : '');
+        ws.set(r + i, 2, st, box()); ws.set(r + i, 3, cls, box()); ws.set(r + i, 4, tch, box());
+        ws.merge(r + i, 5, r + i, 8, x.note || '', V({ sz: 11 })); ws.height(r + i, Math.max(30, lines(x.note, 70) * 15 + 10));
+        ['p', 'd', 'r'].forEach((k, n) => ws.set(r + i, 9 + n, x[k] ? '○' : '', box({ b: 1, sz: 13 })));
+      });
+      r += j.stages.length;
     });
-    ws.height(r, 10); r++;
-    // 기타
-    sec(r, '기타 (요청 · 특이사항)'); r++;
-    ws.set(r, 1, '날짜', H()); ws.set(r, 2, '구분', H()); ws.merge(r, 3, r, 7, '내용', H()); ws.set(r, 8, '작성', H()); ws.height(r, 22); r++;
-    const ns = s.notes || [];
-    for (let i = 0; i < Math.max(ns.length, 4); i++) {
-      const n = ns[i] || {};
-      ws.set(r, 1, n.date ? ymd(n.date) : '', V({ h: 'center', indent: 0, sz: 9 })); ws.set(r, 2, n.type || '', V({ h: 'center', indent: 0, sz: 9 }));
-      ws.merge(r, 3, r, 7, n.text || '', V({ wrap: 1 })); ws.set(r, 8, (n.by || '').replace(/\s*\(.*\)$/, ''), V({ h: 'center', indent: 0, sz: 9, wrap: 1 }));
-      ws.height(r, Math.max(24, lines(n.text, 50) * 14 + 10)); r++;
-    }
-    ws.height(r, 12); r++;
-    ws.merge(r, 1, r, 8, '※ 개인정보가 담긴 문서예요. 교회 밖으로 가져가거나 공유하지 말고, 쓰지 않을 때는 파기해 주세요.', { sz: 8.5, color: C.sub, h: 'center' });
   }
 
   window.XP = XPX;

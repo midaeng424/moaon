@@ -83,7 +83,7 @@
   /* ---------- 창 (모달) ---------- */
   MO.modal = function ({ title, body, foot, wide, onClose }) {
     const sc = document.createElement('div'); sc.className = 'scrim';
-    sc.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-h"><h3></h3><button class="modal-x" aria-label="닫기">✕</button></div><div class="modal-b"></div>${foot !== false ? '<div class="modal-f"></div>' : ''}</div>`;
+    sc.innerHTML = `<div class="modal ${wide === 'x' ? 'wide xwide' : wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="modal-h"><h3></h3><button class="modal-x" aria-label="닫기">✕</button></div><div class="modal-b"></div>${foot !== false ? '<div class="modal-f"></div>' : ''}</div>`;
     sc.querySelector('h3').textContent = title || '';
     const b = sc.querySelector('.modal-b'); if (typeof body === 'string') b.innerHTML = body; else if (body) b.appendChild(body);
     const f = sc.querySelector('.modal-f'); if (f && foot) { if (typeof foot === 'string') f.innerHTML = foot; else f.appendChild(foot); }
