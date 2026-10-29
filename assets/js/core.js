@@ -202,6 +202,17 @@
     for (let k = 0; k < 20 && (1.05 / (lum(r, g, b) + 0.05)) < 2.4; k++) { r = Math.round(r * 0.92); g = Math.round(g * 0.92); b = Math.round(b * 0.92); }
     return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
   };
+  /** 전화번호 모양 맞추기 (숫자만 있을 때만) */
+  MO.fmtPhone = (v) => {
+    v = String(v || '').trim(); if (!v || !/^[\d\s\-.()+]+$/.test(v)) return v;
+    let d = v.replace(/\D/g, ''); if (/^1\d{8,9}$/.test(d)) d = '0' + d;
+    const dash = (a, b) => d.slice(0, a) + '-' + d.slice(a, b) + '-' + d.slice(b);
+    if (/^01\d{8,9}$/.test(d)) return d.length === 11 ? dash(3, 7) : dash(3, 6);
+    if (/^02\d{7,8}$/.test(d)) return d.length === 10 ? dash(2, 6) : dash(2, 5);
+    if (/^0\d{9,10}$/.test(d)) return d.length === 11 ? dash(3, 7) : dash(3, 6);
+    return v;
+  };
+  document.addEventListener('change', (e) => { const t = e.target; if (t && t.matches && t.matches('input[type=tel][data-k="phone"], input[type=tel][data-k="parentPhone"]')) t.value = MO.fmtPhone(t.value); });
   MO.download = (name, blob) => { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); };
   MO.csv = (name, rows) => {
     const s = rows.map(r => r.map(v => { v = String(v ?? ''); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');

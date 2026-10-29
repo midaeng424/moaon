@@ -82,7 +82,8 @@
   let rosSel = '', rosGrade = 0, rosQ = '', rosShowGrad = false;
   P.ros = async function (pg) {
     const canE = A.edit('ros');
-    A.setTitle('교적부', A.xlsBtn() + A.readonlyBadge('ros')); A.bindXls(() => XP.rosOpen());
+    A.setTitle('교적부', (canE ? `<button class="btn o xlsb" id="impBtn" title="엑셀로 한꺼번에 등록">${MO.icon('cloud', 15)}<span>엑셀로 한꺼번에 등록</span></button>` : '') + A.xlsBtn() + A.readonlyBadge('ros')); A.bindXls(() => XP.rosOpen());
+    const ib = document.getElementById('impBtn'); if (ib) ib.onclick = () => RS.importOpen(() => P.ros(pg));
     await A.refreshBoot();
     const drawList = () => {
       const list = A.st.boot.students.filter(s => (rosShowGrad ? s.status === '졸업' : s.status !== '졸업') && (!rosGrade || (A.cls(s.classId) || {}).grade === rosGrade) && (!rosQ || s.name.includes(rosQ)))
@@ -200,8 +201,9 @@
     await A.refreshBoot();
     const B = A.st.boot;
     const draw = () => {
-      if (!mvFrom && B.classes[0]) mvFrom = B.classes[0].id;
-      const mvList = B.students.filter(s => s.status !== '졸업' && s.classId === mvFrom);
+      const noCls = B.students.filter(s => s.status !== '졸업' && !B.classes.some(c => c.id === s.classId));
+      if ((!mvFrom || (mvFrom === '__none' && !noCls.length)) && B.classes[0]) mvFrom = noCls.length ? '__none' : B.classes[0].id;
+      const mvList = mvFrom === '__none' ? noCls : B.students.filter(s => s.status !== '졸업' && s.classId === mvFrom);
       const cls = B.classes.slice().sort((a, b) => (b.active - a.active) || a.grade - b.grade || a.order - b.order);
       const cnt = (id) => B.students.filter(s => s.status !== '졸업' && s.classId === id).length;
       const tname = (id) => { const t = B.teachers.find(x => x.id === id); return t ? t.name : ''; };
@@ -223,9 +225,9 @@
           <div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>역할</th><th>담당 반</th><th>연락처</th>${canE ? '<th></th>' : ''}</tr></thead><tbody>
           ${B.teachers.map(t => { const cs = B.classes.filter(c => c.teacherId === t.id || c.assistantId === t.id).map(c => `${c.grade}학년 ${c.name}`).join(', '); return `<tr><td><b>${esc(t.name)}</b></td><td><span class="tag" style="${t.role === '담임' ? '--b:#fff3d6;--c:#a8621f' : '--b:#e6f0fa;--c:#3d7cb8'}">${t.role}</span></td><td>${esc(cs) || '<span class="note">-</span>'}</td><td class="note">${esc(t.phone) || '-'}</td>${canE ? `<td class="r"><button class="btn o sm" data-tedit="${t.id}">수정</button></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="5">${A.empty('선생님을 등록해 주세요')}</td></tr>`}</tbody></table></div></div>
         <div class="card"><div class="ch"><b>학생 반 옮기기 · 졸업</b><span>새 학년도 진급 때 써요</span></div>
-          <div class="chips" style="margin-bottom:10px">${B.classes.map(c => `<button class="chip ${mvFrom === c.id ? 'on' : ''}" data-from="${c.id}">${c.grade}학년 ${esc(c.name)}</button>`).join('')}</div>
+          <div class="chips" style="margin-bottom:10px">${noCls.length ? `<button class="chip ${mvFrom === '__none' ? 'on' : ''}" data-from="__none" style="--b:#fde8e1;--c:#cf5c45">반 없음 ${noCls.length}</button>` : ''}${B.classes.map(c => `<button class="chip ${mvFrom === c.id ? 'on' : ''}" data-from="${c.id}">${c.grade}학년 ${esc(c.name)}</button>`).join('')}</div>
           <div class="list" style="max-height:300px;overflow-y:auto">${mvList.map(s => `<button class="li" data-mv="${s.id}" style="width:100%;text-align:left" ${canE ? '' : 'disabled'}><span class="cbox ${mvSel.has(s.id) ? 'on' : ''}">${MO.icon('check', 13, 'stroke-width="3.5"')}</span><div><b>${esc(s.name)}</b></div></button>`).join('') || '<p class="note" style="margin:0">이 반에 학생이 없어요</p>'}</div>
-          ${canE ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><select class="inp" id="mvTo" style="flex:1;min-width:150px"><option value="">옮길 곳 고르기</option>${B.classes.filter(c => c.id !== mvFrom).map(c => `<option value="${c.id}">${c.grade}학년 ${esc(c.name)}으로</option>`).join('')}<option value="__grad">졸업 처리</option></select><button class="btn y" data-domove="1" ${mvSel.size ? '' : 'disabled'}>${mvSel.size}명 옮기기</button></div><p class="note" style="margin:8px 0 0">반을 옮기면 이전 반과 담임이 교적부 '이전 기관 담임'에 자동으로 남아요.</p>` : ''}</div></div>`;
+          ${canE ? `<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><select class="inp" id="mvTo" style="flex:1;min-width:150px"><option value="">옮길 곳 고르기</option>${B.classes.filter(c => c.id !== mvFrom).map(c => `<option value="${c.id}">${c.grade}학년 ${esc(c.name)}으로</option>`).join('')}<option value="__grad">졸업 처리</option></select><button class="btn y" data-domove="1" ${mvSel.size ? '' : 'disabled'}>${mvSel.size}명 옮기기</button></div><p class="note" style="margin:8px 0 0">반을 옮기면 이전 반과 담임이 교적부 '생활 기록부'에 자동으로 남아요.</p>` : ''}</div></div>`;
     };
     const classForm = async (c) => {
       const v = await MO.form({ title: c ? '반 수정' : '반 추가', fields: [

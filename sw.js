@@ -1,5 +1,5 @@
 /* 모아온 서비스 워커 — 화면 파일을 저장해 두어 빠르게 열고, 데이터는 항상 서버에서 새로 받아요 */
-const CACHE = 'moaon-v10';
+const CACHE = 'moaon-v12';
 const FILES = ['./', './index.html', './admin.html', './config.js', './manifest.webmanifest', './manifest-admin.webmanifest',
   './assets/css/fonts.css', './assets/css/base.css', './assets/css/kids.css', './assets/css/admin.css',
   './assets/js/core.js', './assets/js/lesson.js', './assets/js/kids.js', './assets/js/admin.js', './assets/js/admin-pages.js', './assets/js/admin-roster.js', './assets/js/admin-pages2.js', './assets/js/xlsx.js', './assets/js/admin-export.js',

@@ -198,5 +198,61 @@
     let p = 0; all.forEach(u => { out.set(u, p); p += u.length; }); return out;
   }
 
-  window.XL = { book: () => new Book(), ref, rng, colL };
+
+  /* ---------- 읽기: .xlsx 파일 → [{ name, rows: [[값...]] }] ---------- */
+  async function inflate(u8) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('이 브라우저에서는 엑셀 파일을 읽을 수 없어요. 크롬이나 엣지 최신 버전으로 열어 주세요.');
+    const ds = new DecompressionStream('deflate-raw');
+    const out = new Response(new Blob([u8]).stream().pipeThrough(ds));
+    return new Uint8Array(await out.arrayBuffer());
+  }
+  async function unzip(buf) {
+    const u8 = new Uint8Array(buf), dv = new DataView(buf);
+    let e = -1; for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error('엑셀(.xlsx) 파일이 아니에요. 엑셀에서 "다른 이름으로 저장 → Excel 통합 문서(.xlsx)"로 저장해 주세요.');
+    const n = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true); const files = {}, dec = new TextDecoder();
+    for (let k = 0; k < n; k++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      const name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+      files[name] = { method, csize, off }; p += 46 + nl + xl + cl;
+    }
+    const get = async (name) => {
+      const f = files[name]; if (!f) return null;
+      const lnl = dv.getUint16(f.off + 26, true), lxl = dv.getUint16(f.off + 28, true), start = f.off + 30 + lnl + lxl, data = u8.subarray(start, start + f.csize);
+      return dec.decode(f.method === 8 ? await inflate(data) : data);
+    };
+    return { files, get };
+  }
+  const colNum = (ref) => { let n = 0; for (const ch of ref.replace(/\d+/g, '')) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
+  async function read(file) {
+    const z = await unzip(await file.arrayBuffer()), P = new DOMParser(), xml = (t) => P.parseFromString(t || '<x/>', 'application/xml');
+    const wb = xml(await z.get('xl/workbook.xml')), rels = xml(await z.get('xl/_rels/workbook.xml.rels'));
+    const relMap = {}; [...rels.getElementsByTagName('Relationship')].forEach(r => { relMap[r.getAttribute('Id')] = r.getAttribute('Target'); });
+    const ssDoc = xml(await z.get('xl/sharedStrings.xml'));
+    const shared = [...ssDoc.getElementsByTagName('si')].map(si => [...si.getElementsByTagName('t')].map(t => t.textContent).join(''));
+    const out = [];
+    for (const sh of [...wb.getElementsByTagName('sheet')]) {
+      const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+      let target = relMap[rid] || ''; target = target.replace(/^\/?xl\//, '').replace(/^\//, '');
+      const doc = xml(await z.get('xl/' + target)), rows = [];
+      [...doc.getElementsByTagName('row')].forEach(r => {
+        const ri = Number(r.getAttribute('r')) - 1, arr = rows[ri] = rows[ri] || [];
+        [...r.getElementsByTagName('c')].forEach(c => {
+          const t = c.getAttribute('t'), v = c.getElementsByTagName('v')[0], ci = colNum(c.getAttribute('r') || 'A1') - 1;
+          let val = null;
+          if (t === 's') val = shared[Number(v && v.textContent)] ?? '';
+          else if (t === 'inlineStr') val = [...c.getElementsByTagName('t')].map(x => x.textContent).join('');
+          else if (t === 'str') val = v ? v.textContent : '';
+          else if (t === 'b') val = v ? v.textContent === '1' : false;
+          else if (v) { const num = Number(v.textContent); val = isNaN(num) ? v.textContent : num; }
+          arr[ci] = val;
+        });
+      });
+      out.push({ name: sh.getAttribute('name'), rows: Array.from(rows, r => r || []) });
+    }
+    return out;
+  }
+
+  window.XL = { book: () => new Book(), read, ref, rng, colL };
 })();

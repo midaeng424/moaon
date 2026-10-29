@@ -441,7 +441,7 @@
     ws.merge(r, 1, r, 8, '생활 기록부', box({ sz: 12, fill: '83CBEB' })); ws.merge(r, 9, r + 1, 9, '개근', box({ sz: 11, fill: '5B9BD5', color: 'FFFFFF' })); ws.merge(r, 10, r + 1, 10, '정근', box({ sz: 11, fill: 'F8CBAD' })); ws.merge(r, 11, r + 1, 11, '구속사', box({ sz: 10, fill: 'F8CBAD' })); ws.height(r, 24); r++;
     ws.set(r, 1, '구분', L()); ws.set(r, 2, '연령', box({ sz: 13 })); ws.set(r, 3, '반', box({ sz: 13 })); ws.set(r, 4, '담임', box({ sz: 13 })); ws.merge(r, 5, r, 8, '전달 사항', box({ sz: 13 })); ws.height(r, 24); r++;
     const life = s.life || {}, cur = s.grade ? s.grade + '학년' : '';
-    JK.forEach(j => {
+    JK.slice(2).forEach(j => { // 생활 기록부: 유년부 ~ 소년부
       ws.merge(r, 1, r + j.stages.length - 1, 1, j.k, L({ fill: j.c }));
       j.stages.forEach((st, i) => {
         const x = life[st] || {}, isCur = st === cur && s.status !== '졸업';
