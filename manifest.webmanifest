@@ -1,0 +1,17 @@
+{
+  "name": "모아온 with 로이&모아",
+  "short_name": "모아온",
+  "description": "사무엘 주일학교 초등부 말씀 암송",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdf7ee",
+  "theme_color": "#f5b335",
+  "lang": "ko",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
