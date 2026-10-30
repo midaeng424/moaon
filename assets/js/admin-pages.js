@@ -1,12 +1,12 @@
-/* 관리자 화면 1 — 대시보드 · 출석 · 헌금 · 달란트 · 회계 */
+/* 관리자 화면 1 — 홈 · 출석 · 헌금 · 달란트 · 회계 */
 (function () {
   const A = window.ADM, P = A.pages, esc = MO.esc;
   const MONTHS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
-  /* =================== 대시보드 =================== */
+  /* =================== 홈 =================== */
   let calMonth = null;
   P.dash = async function (pg) {
-    A.setTitle('대시보드', A.yearSel()); A.bindYear(() => P.dash(pg));
+    A.setTitle('홈', A.yearSel()); A.bindYear(() => P.dash(pg));
     const d = await MO.api('dashboard', { year: A.st.year }, { loader: false });
     const me = A.st.me, money = A.can('acc');
     const today = A.st.boot.today;
@@ -21,7 +21,9 @@
     const rates = d.monthlyRates.slice(0, labels.length);
     const valid = rates.map((v, i) => [v, i]).filter(x => x[0] != null);
     const best = valid.length ? valid.reduce((a, b) => b[0] > a[0] ? b : a) : null, worst = valid.length ? valid.reduce((a, b) => b[0] < a[0] ? b : a) : null;
-    pg.innerHTML = `<div class="welcome"><div><b>안녕하세요, ${esc(me.name)} 님!</b></div><div class="imgs"><img src="${MO.asset('roi.webp')}" alt=""><img src="${MO.asset('moa.webp')}" alt=""></div></div>
+    const hello = (() => { const h = new Date().getHours(); return h < 11 ? '좋은 아침이에요' : h < 18 ? '안녕하세요' : '오늘도 수고 많으셨어요'; })();
+    pg.innerHTML = `<div class="welcome"><div class="wt"><b>${hello}, ${esc(me.name)} 님!</b><span>${MO.mdK(today)} ${MO.dowK(today)}요일 · 다음 주일까지 ${MO.dow(today) === 0 ? '오늘이 주일이에요' : (7 - MO.dow(today)) + '일'}</span></div><div class="imgs"><img src="${MO.asset('roi.webp')}" alt=""><img src="${MO.asset('moa.webp')}" alt=""></div></div>
+
       <div class="kpis" style="--n:${kp.length}">${kp.join('')}</div>
       <div class="${money ? 'g2' : ''}"><div class="card"><div class="ch"><b>출석 현황</b><div class="lgd"><span><i style="--c:#eea21f"></i>월평균 출석률</span><span><i style="--c:#78a744"></i>연간 평균</span></div></div>
         ${best ? `<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:4px"><div><span class="note">가장 높은 달</span> <b>${MONTHS[best[1]]} · ${best[0]}%</b></div><div><span class="note">가장 낮은 달</span> <b>${MONTHS[worst[1]]} · ${worst[0]}%</b></div><div><span class="note">이번 달</span> <b style="color:var(--mane)">${rates[rates.length - 1] != null ? rates[rates.length - 1] + '%' : '-'}</b></div></div>` : ''}
@@ -84,14 +86,25 @@
       const list = studs.filter(s => !attClass || s.classId === attClass).sort((a, b) => (A.clsLabel(a.classId) + a.name).localeCompare(A.clsLabel(b.classId) + b.name, 'ko'));
       if (attTab === 'check') {
         const day = byDate[attDate] || {}; const sel = Object.assign({}, day); A._attSel = sel;
-        const cnt = () => list.filter(s => sel[s.id] === 1).length;
-        pg.innerHTML = `${tabs}<div class="card"><div class="ch"><div class="acts" style="align-items:center"><input type="date" class="inp" id="attDate" value="${attDate}" style="width:auto"><span class="note">${MO.dowK(attDate)}요일${MO.dow(attDate) !== 0 ? ' · 주일이 아니에요' : ''}</span></div><div class="acts"><button class="btn o" data-all="1">모두 출석</button><button class="btn" data-save="1">${MO.icon('check', 16)}저장하기</button></div></div>
-          ${clsChips}<div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(120deg,#edf5e1,#fff3d6);border-radius:16px;padding:12px 16px;margin:12px 0"><span style="font-weight:800">${attClass ? esc(A.clsLabel(attClass)) + (A.teacher(A.cls(attClass).teacherId) ? ' · 담임 ' + esc(A.teacher(A.cls(attClass).teacherId).name) : '') : '초등부 전체'}</span><b id="attCnt" style="font-size:24px;color:var(--grn-t)">${cnt()} / ${list.length}</b></div>
-          <div class="list" id="attList">${list.length ? list.map(s => `<div class="li"><span class="av" style="--c:${A.clsColor(s.classId)};width:36px;height:36px">${esc(s.name.slice(-2))}</span><div><b>${esc(s.name)}</b><span>${esc(A.clsLabel(s.classId))}</span></div><span class="seg" data-sid="${s.id}"><button class="${sel[s.id] === 1 ? 'y' : ''}" data-v="1">출석</button><button class="${sel[s.id] === 0 ? 'n' : ''}" data-v="0">결석</button></span></div>`).join('') : A.empty('학생이 없어요. 교적부에서 먼저 등록해 주세요.')}</div>
-          <p class="note" style="margin:12px 0 0">출석으로 저장하면 '주일 출석' 달란트가 자동으로 들어가고, 결석으로 바꾸면 다시 빠져요.</p></div>`;
-        pg.querySelector('#attDate').onchange = (e) => { attDate = e.target.value; if (attDate.slice(0, 4) !== String(A.st.year)) { A.st.year = Number(attDate.slice(0, 4)); P.att(pg); } else draw(); };
-        pg._cnt = () => { pg.querySelector('#attCnt').textContent = cnt() + ' / ' + list.length; };
-        pg._list = list;
+        const groups = []; list.forEach(s => { const g = groups[groups.length - 1]; if (g && g.id === s.classId) g.list.push(s); else groups.push({ id: s.classId, list: [s] }); });
+        const cell = (s) => `<div class="acell ${sel[s.id] === 1 ? 'is-y' : sel[s.id] === 0 ? 'is-n' : ''}" data-sid="${s.id}">${A.av(s.name, A.clsColor(s.classId), 34)}<b>${esc(s.name)}</b><span class="amark"><button type="button" data-v="1" aria-label="${esc(s.name)} 출석">${MO.icon('check', 17)}</button><button type="button" data-v="0" aria-label="${esc(s.name)} 결석">${MO.icon('x', 16)}</button></span></div>`;
+        const ghead = (g) => { const c = A.cls(g.id), t = c && A.teacher(c.teacherId); return `<div class="agh"><i style="--c:${A.clsColor(g.id)}"></i><b>${esc(A.clsLabel(g.id))}</b>${t ? `<span>담임 ${esc(t.name)}</span>` : ''}<em data-gc="${g.id || 'none'}"></em></div>`; };
+        const isSun = MO.dow(attDate) === 0;
+        pg.innerHTML = `${tabs}<div class="card attc"><div class="atool">
+            <div class="adate"><button type="button" class="btn o ic" data-dstep="-7" aria-label="지난 주일">${MO.icon('chevL', 18)}</button><label class="adpick">${MO.icon('att', 17)}<b>${MO.mdK(attDate)} (${MO.dowK(attDate)})</b><input type="date" id="attDate" value="${attDate}" aria-label="날짜 고르기"></label><button type="button" class="btn o ic" data-dstep="7" aria-label="다음 주일" ${attDate >= MO.lastSunday(today) ? 'disabled' : ''}>${MO.icon('chevR', 18)}</button>${!isSun ? '<span class="tag" style="--b:#fde8e1;--c:#cf5c45">주일이 아니에요</span>' : attDate === MO.lastSunday(today) ? '<span class="tag" style="--b:#edf5e1;--c:#5b8a2e">이번 주일</span>' : ''}</div>
+            <button class="btn o" data-all="1">${MO.icon('check', 15)}남은 친구 모두 출석</button></div>
+          <div class="chips scrollx">${'<button class="chip ' + (!attClass ? 'on' : '') + '" data-cls="">전체 ' + studs.length + '</button>' + A.activeClasses().map(c => `<button class="chip ${attClass === c.id ? 'on' : ''}" data-cls="${c.id}"><i class="cdot" style="--c:${c.color}"></i>${c.grade}학년 ${esc(c.name)}</button>`).join('')}</div>
+          <div id="attList">${list.length ? groups.map(g => `<section class="agrp">${ghead(g)}<div class="agrid">${g.list.map(cell).join('')}</div></section>`).join('') : A.empty('학생이 없어요. 교적부에서 먼저 등록해 주세요.')}</div>
+          <p class="note" style="margin:4px 0 0">✓ 출석 · ✕ 결석. 출석으로 저장하면 '주일 출석' 달란트가 자동으로 들어가고, 결석으로 바꾸면 다시 빠져요.</p></div>
+          <div class="asave"><div class="asum"><span class="y"><i></i>출석 <b data-c="y">0</b></span><span class="n"><i></i>결석 <b data-c="n">0</b></span><span class="u"><i></i>아직 <b data-c="u">0</b></span><div class="abar"><i data-bar="y"></i><i data-bar="n"></i></div></div><button class="btn lg" data-save="1">${MO.icon('check', 17)}저장하기</button></div>`;
+        pg.querySelector('#attDate').onchange = (e) => { if (!e.target.value) return; attDate = e.target.value; if (attDate.slice(0, 4) !== String(A.st.year)) { A.st.year = Number(attDate.slice(0, 4)); P.att(pg); } else draw(); };
+        pg._cnt = () => {
+          const y = list.filter(s => sel[s.id] === 1).length, n = list.filter(s => sel[s.id] === 0).length, u = list.length - y - n, T = Math.max(1, list.length);
+          pg.querySelector('[data-c="y"]').textContent = y; pg.querySelector('[data-c="n"]').textContent = n; pg.querySelector('[data-c="u"]').textContent = u;
+          pg.querySelector('[data-bar="y"]').style.width = (y / T * 100) + '%'; pg.querySelector('[data-bar="n"]').style.width = (n / T * 100) + '%';
+          groups.forEach(g => { const el = pg.querySelector(`[data-gc="${g.id || 'none'}"]`); if (el) el.textContent = `${g.list.filter(s => sel[s.id] === 1).length} / ${g.list.length}`; });
+        };
+        pg._list = list; pg._cnt();
       } else {
         const lastDates = dates.filter(x => x <= today).slice(-8);
         const curM = String(A.st.year) === today.slice(0, 4) ? Number(today.slice(5, 7)) : 12;
@@ -117,9 +130,10 @@
     pg.onclick = async (e) => {
       const t = e.target.closest('[data-tab]'); if (t) { attTab = t.dataset.tab; return draw(); }
       const c = e.target.closest('[data-cls]'); if (c) { attClass = attClass === c.dataset.cls ? '' : c.dataset.cls; return draw(); }
-      const seg = e.target.closest('.seg button');
-      if (seg) { const sid = seg.parentElement.dataset.sid, v = Number(seg.dataset.v); A._attSel[sid] = v; seg.parentElement.querySelectorAll('button').forEach(b => b.className = ''); seg.className = v ? 'y' : 'n'; pg._cnt(); return; }
-      if (e.target.closest('[data-all]')) { pg._list.forEach(s => { A._attSel[s.id] = 1; }); pg.querySelectorAll('.seg').forEach(sg => { sg.children[0].className = 'y'; sg.children[1].className = ''; }); pg._cnt(); return; }
+      const mk = e.target.closest('.acell [data-v]');
+      if (mk) { const c = mk.closest('.acell'), sid = c.dataset.sid, v = Number(mk.dataset.v); if (A._attSel[sid] === v) delete A._attSel[sid]; else A._attSel[sid] = v; c.classList.toggle('is-y', A._attSel[sid] === 1); c.classList.toggle('is-n', A._attSel[sid] === 0); pg._cnt(); return; }
+      const ds = e.target.closest('[data-dstep]'); if (ds) { const d0 = new Date(attDate + 'T00:00:00Z'); d0.setUTCDate(d0.getUTCDate() + Number(ds.dataset.dstep)); const nd = MO.lastSunday(d0.toISOString().slice(0, 10)); attDate = nd; if (nd.slice(0, 4) !== String(A.st.year)) { A.st.year = Number(nd.slice(0, 4)); return P.att(pg); } return draw(); }
+      if (e.target.closest('[data-all]')) { pg._list.forEach(s => { if (A._attSel[s.id] !== 0) A._attSel[s.id] = 1; }); pg.querySelectorAll('.acell').forEach(c => { if (!c.classList.contains('is-n')) c.classList.add('is-y'); }); pg._cnt(); return; }
       if (e.target.closest('[data-save]')) {
         const items = pg._list.filter(s => A._attSel[s.id] === 0 || A._attSel[s.id] === 1).map(s => ({ studentId: s.id, status: A._attSel[s.id] }));
         if (!items.length) return MO.toast('출석/결석을 먼저 눌러 주세요', 'err');
@@ -147,7 +161,7 @@
       <p class="note" style="margin:12px 0 0">헌금은 종류별 금액만 기록해요. 개인별 헌금 내역은 저장하지 않아요.</p></div></div>
       <div class="card"><div class="ch"><b>주일별 헌금 기록</b><div class="acts">${canE ? `<button class="btn" data-add="1">${MO.icon('plus', 16)}헌금 입력</button>` : ''}</div></div>
       <div class="tscroll"><table class="t"><thead><tr><th>주일</th>${OFFT.map(([, n]) => `<th class="r">${n}</th>`).join('')}<th class="r">합계</th><th>계수 확인</th><th>상태</th>${canE ? '<th></th>' : ''}</tr></thead><tbody>
-      ${list.map(o => { const t = OFFT.reduce((a, [k]) => a + o[k], 0); return `<tr><td><b>${MO.md(o.date)}</b> <span class="note">${o.date.slice(0, 4)}</span></td>${OFFT.map(([k]) => `<td class="r">${o[k] ? MO.won(o[k]) : '<span class="note">-</span>'}</td>`).join('')}<td class="r"><b>${MO.won(t)}</b></td><td>${esc(o.counters) || '<span class="note">-</span>'}</td><td>${o.confirmed ? '<span class="tag" style="--b:#edf5e1;--c:#5b8a2e">확인 완료</span>' : '<span class="tag" style="--b:#fff3d6;--c:#a8621f">확인 대기</span>'}</td>${canE ? `<td class="r"><button class="btn o sm" data-edit="${o.id}">수정</button> <button class="btn o sm" data-del="${o.id}" aria-label="지우기">${MO.icon('trash', 14)}</button></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="9">${A.empty('아직 헌금 기록이 없어요')}</td></tr>`}
+      ${A.mgroup('off' + A.st.year, list, o => o.date, o => { const t = OFFT.reduce((a, [k]) => a + o[k], 0); return `<tr><td><b>${MO.md(o.date)}</b> <span class="note">${o.date.slice(0, 4)}</span></td>${OFFT.map(([k]) => `<td class="r">${o[k] ? MO.won(o[k]) : '<span class="note">-</span>'}</td>`).join('')}<td class="r"><b>${MO.won(t)}</b></td><td>${esc(o.counters) || '<span class="note">-</span>'}</td><td>${o.confirmed ? '<span class="tag" style="--b:#edf5e1;--c:#5b8a2e">확인 완료</span>' : '<span class="tag" style="--b:#fff3d6;--c:#a8621f">확인 대기</span>'}</td>${canE ? `<td class="r"><button class="btn o sm" data-edit="${o.id}">수정</button> <button class="btn o sm" data-del="${o.id}" aria-label="지우기">${MO.icon('trash', 14)}</button></td>` : ''}</tr>`; }, g => `합계 <b>${MO.won(g.reduce((a, o) => a + OFFT.reduce((x, [k]) => x + o[k], 0), 0))}</b>`, canE ? 9 : 8) || `<tr><td colspan="9">${A.empty('아직 헌금 기록이 없어요')}</td></tr>`}
       </tbody></table></div><p class="note" style="margin:10px 0 0">헌금을 입력하면 회계 장부에 '수입 · 헌금'으로 자동으로 들어가요.</p></div>`;
     const form = async (o) => {
       const v = await MO.form({ title: o ? '헌금 수정' : '헌금 입력', fields: [
@@ -260,7 +274,7 @@
           ${canE && !coachOff() ? `<div class="coach dnd" id="coach" role="note"><span class="ic">${MO.icon('cloud', 20)}</span><div><b>영수증은 끌어다 놓기만 하면 돼요</b><span>파일을 장부의 <u>지출 줄 위</u>에 놓으면 그 거래에 바로 붙어요. 빈 곳에 놓으면 어느 거래에 붙일지 골라요. (JPG·PNG·PDF, 여러 장 가능)</span></div><button class="btn sm" id="coachOk">알겠어요</button></div>` : ''}<div class="dropveil">${MO.icon('cloud', 30)}<b>여기에 놓으세요</b><span>지출 줄 위에 놓으면 그 거래에 바로 붙어요</span></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><div class="chips">${[['all', '전체'], ['in', '수입'], ['out', '지출'], ['norc', `영수증 미첨부 ${noRc.length}`]].map(([k, l]) => `<button class="chip ${accTab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><select class="inp" id="accMonth" style="width:auto;margin-left:auto;padding:6px 10px" aria-label="달 고르기"><option value="0">모든 달</option>${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${accMonth === m ? 'selected' : ''}>${m}월</option>`).join('')}</select></div>
           <div class="tscroll"><table class="t"><thead><tr><th>날짜</th><th>구분</th><th>항목</th><th>내용</th><th class="r">금액</th><th class="r hide-m">잔액</th><th class="c">영수증</th>${canE ? '<th></th>' : ''}</tr></thead><tbody>
-          ${rows.map(r => `<tr data-row="${r.id}"><td>${MO.md(r.date)}</td><td><span class="tag" style="${r.kind === '수입' ? '--b:#edf5e1;--c:#5b8a2e' : '--b:#fde8e1;--c:#cf5c45'}">${r.kind}</span></td><td>${esc(r.category)}</td><td class="wrap">${esc(r.desc)}${r.offeringId ? ' <span class="tag" style="--b:#fff3d6;--c:#a8621f">헌금 자동</span>' : ''}</td><td class="r"><b style="color:${r.kind === '수입' ? '#5b8a2e' : '#cf5c45'}">${r.kind === '수입' ? '+' : '−'}${MO.won(r.amount)}</b></td><td class="r hide-m">${MO.won(bal[r.id])}</td><td class="c">${r.receiptId ? `<button class="rc" data-rc="${r.id}" title="${esc(r.receiptName)}" aria-label="영수증 보기">${MO.icon('clip', 15)}</button>` : r.kind === '지출' ? (canE ? `<button class="tag" data-attach="${r.id}" style="--b:#fff3d6;--c:#a8621f;cursor:pointer">첨부하기</button>` : '<span class="tag" style="--b:#fff3d6;--c:#a8621f">미첨부</span>') : '<span class="note">-</span>'}</td>${canE ? `<td class="r">${r.offeringId ? '' : `<button class="btn o sm" data-edit="${r.id}">수정</button>`}</td>` : ''}</tr>`).join('') || `<tr><td colspan="8">${A.empty('거래가 없어요')}</td></tr>`}</tbody></table></div></div></div>
+          ${A.mgroup('acc' + A.st.year, rows, r => r.date, r => `<tr data-row="${r.id}"><td>${MO.md(r.date)}</td><td><span class="tag" style="${r.kind === '수입' ? '--b:#edf5e1;--c:#5b8a2e' : '--b:#fde8e1;--c:#cf5c45'}">${r.kind}</span></td><td>${esc(r.category)}</td><td class="wrap">${esc(r.desc)}${r.offeringId ? ' <span class="tag" style="--b:#fff3d6;--c:#a8621f">헌금 자동</span>' : ''}</td><td class="r"><b style="color:${r.kind === '수입' ? '#5b8a2e' : '#cf5c45'}">${r.kind === '수입' ? '+' : '−'}${MO.won(r.amount)}</b></td><td class="r hide-m">${MO.won(bal[r.id])}</td><td class="c">${r.receiptId ? `<button class="rc" data-rc="${r.id}" title="${esc(r.receiptName)}" aria-label="영수증 보기">${MO.icon('clip', 15)}</button>` : r.kind === '지출' ? (canE ? `<button class="tag" data-attach="${r.id}" style="--b:#fff3d6;--c:#a8621f;cursor:pointer">첨부하기</button>` : '<span class="tag" style="--b:#fff3d6;--c:#a8621f">미첨부</span>') : '<span class="note">-</span>'}</td>${canE ? `<td class="r">${r.offeringId ? '' : `<button class="btn o sm" data-edit="${r.id}">수정</button>`}</td>` : ''}</tr>`, g => { const i = g.filter(r => r.kind === '수입').reduce((a, r) => a + r.amount, 0), o = g.filter(r => r.kind === '지출').reduce((a, r) => a + r.amount, 0); return `<em class="pin">+${MO.won(i)}</em><em class="mout">−${MO.won(o)}</em>`; }, canE ? 8 : 7) || `<tr><td colspan="8">${A.empty('거래가 없어요')}</td></tr>`}</tbody></table></div></div></div>
         <input type="file" id="rowFile" accept="image/*,application/pdf" hidden>`;
       const g = pg.querySelector('.accgrid'); if (innerWidth < 1180) g.style.gridTemplateColumns = '1fr';
       pg.querySelector('#accMonth').onchange = (e) => { accMonth = Number(e.target.value); draw(); };

@@ -38,7 +38,7 @@
       const r = life[st] || {}, isCur = auto && auto.stage === st && s.status !== '졸업';
       const cls = r.cls || (isCur ? auto.cls : ''), tch = r.teacher || (isCur ? auto.teacher : '');
       const tg = (k, l) => `<label class="tgl"><input type="checkbox" data-l="${k}" ${r[k] ? 'checked' : ''}><span>${l}</span></label>`;
-      return `<div class="lrow ${isCur ? 'cur' : ''}" data-st="${st}"><span class="lage">${st}${isCur ? '<em>지금</em>' : ''}</span><input class="inp" data-l="cls" value="${esc(cls)}" placeholder="반" maxlength="20"><input class="inp" data-l="teacher" value="${esc(tch)}" placeholder="담임" maxlength="20"><input class="inp" data-l="note" value="${esc(r.note || '')}" placeholder="전달 사항" maxlength="300"><div class="tgls">${tg('p', '개근')}${tg('d', '정근')}${tg('r', '구속사')}</div></div>`;
+      return `<div class="lrow ${isCur ? 'cur' : ''}" data-st="${st}"><span class="lage">${st}${isCur ? '<em>지금</em>' : ''}</span><input class="inp" data-l="cls" value="${esc(cls)}" placeholder="반" maxlength="20"><input class="inp" data-l="teacher" value="${esc(tch)}" placeholder="담임" maxlength="20"><input class="inp" data-l="note" value="${esc(r.note || '')}" placeholder="전달 사항" maxlength="600"><div class="tgls">${tg('p', '개근')}${tg('d', '정근')}${tg('r', '구속사')}</div></div>`;
     }).join('')}</div>`).join('');
     return `<div class="sform">
       <div class="row2">${inp('name', '이름 *', 'text', '예: 이평강', 20)}${sel('classId', '반', A.st.boot.classes.map(c => [c.id, `${c.grade}학년 ${c.name}`]))}</div>

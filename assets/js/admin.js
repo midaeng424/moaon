@@ -25,7 +25,7 @@
 
   /* ---------- 메뉴 ---------- */
   A.MENU = [
-    { key: 'dash', label: '대시보드', icon: 'dash', perm: 'dash' },
+    { key: 'dash', label: '홈', icon: 'home', perm: 'dash' },
     { key: 'att', label: '출석', icon: 'att', perm: 'att' },
     { key: 'off', label: '헌금', icon: 'off', perm: 'off' },
     { key: 'tal', label: '달란트', icon: 'tal', perm: 'tal' },
@@ -168,10 +168,10 @@
   }
   function shell() {
     const me = A.st.me, vis = A.MENU.filter(A.visible);
-    const navBtn = (m) => `<button class="nav" data-go="${m.key}">${MO.icon(m.icon, 20)}${esc(m.label)}${m.badge ? `<span class="bdg" style="${m.master ? '--b:#3f3228;--c:#fff' : '--b:#edf5e1;--c:#5b8a2e'}">${m.badge}</span>` : ''}${me.role === 'pastor' && m.key !== 'report' ? '<span class="bdg" style="--b:#e6f0fa;--c:#3d7cb8">보기</span>' : ''}</button>`;
+    const navBtn = (m) => `<button class="nav" data-go="${m.key}" title="${esc(m.label)}">${MO.icon(m.icon, 20)}<span class="nl">${esc(m.label)}</span>${m.badge ? `<span class="bdg" style="${m.master ? '--b:#3f3228;--c:#fff' : '--b:#edf5e1;--c:#5b8a2e'}">${m.badge}</span>` : ''}${me.role === 'pastor' && m.key !== 'report' ? '<span class="bdg" style="--b:#e6f0fa;--c:#3d7cb8">보기</span>' : ''}</button>`;
     const g1 = vis.filter(m => !m.group), g2 = vis.filter(m => m.group === 2), g3 = vis.filter(m => m.group === 3);
     const ordered = me.role === 'pastor' ? [...g3, ...g1, ...g2] : [...g1, ...g2, ...g3];
-    app.innerHTML = `<div class="shell"><aside class="side"><div class="brand"><img src="${MO.asset('logo.webp')}" alt="모아온"><small>${esc(A.st.boot.org)} · 관리자</small></div>
+    app.innerHTML = `<div class="shell ${MO.store.get('sideMini', false) ? 'mini' : ''}"><aside class="side"><div class="brand"><img class="full" src="${MO.asset('logo.webp')}" alt="모아온"><img class="icon" src="${MO.asset('icon-rounded.png')}" alt="모아온"><small>${esc(A.st.boot.org)} · 관리자</small><button class="fold" data-act="fold" title="메뉴 접기 / 펼치기" aria-label="메뉴 접기 / 펼치기">${MO.icon('fold', 18)}</button></div>
       ${me.role === 'pastor' ? g3.map(navBtn).join('') + '<hr>' + g1.map(navBtn).join('') + g2.map(navBtn).join('') : g1.map(navBtn).join('') + (g2.length ? '<hr>' + g2.map(navBtn).join('') : '') + '<div class="grow"></div>' + (g3.length ? '<hr>' + g3.map(navBtn).join('') : '')}
       <div class="mecard"><div class="mehead"><button class="meav" data-act="profile" title="내 프로필 · 사진 바꾸기">${A.av(me.name, me.role === 'master' ? '#3f3228' : '#d98a1c', 40, me.photo)}</button><div><b>${esc(me.name)}</b> <span class="role" style="--b:${me.role === 'master' ? '#3f3228' : '#fff3d6'};--c:${me.role === 'master' ? '#fff' : '#a8621f'}">${esc(me.roleLabel)}</span></div></div>
         <div class="sess"><span title="남은 로그인 시간">${MO.icon('clock', 14)}<b data-sess>2:00:00</b></span><i></i><button data-act="extend">연장</button></div>
@@ -183,6 +183,7 @@
     app.onclick = (e) => {
       const g = e.target.closest('[data-go]'); if (g && g.closest('.side,.mnav')) { location.hash = g.dataset.go; return; }
       const a = e.target.closest('[data-act]'); if (!a || !a.closest('.side,.mnav')) return;
+      if (a.dataset.act === 'fold') { const sh = app.querySelector('.shell'); sh.classList.toggle('mini'); MO.store.set('sideMini', sh.classList.contains('mini')); return; }
       if (a.dataset.act === 'pw') changePw(false);
       if (a.dataset.act === 'extend') A.sess.extend();
       if (a.dataset.act === 'profile') A.profile();
@@ -202,8 +203,26 @@
     document.getElementById('tr').innerHTML = right;
     document.title = title + ' · 모아온 관리자';
   };
-  A.yearSel = () => { const y = Number(A.st.boot.today.slice(0, 4)); const ys = []; for (let i = y + 1; i >= y - 4; i--) ys.push(i); return `<select class="inp" id="yearSel" aria-label="연도">${ys.map(v => `<option ${v === A.st.year ? 'selected' : ''} value="${v}">${v}년</option>`).join('')}</select>`; };
-  A.bindYear = (rerender) => { const s = document.getElementById('yearSel'); if (s) s.onchange = () => { A.st.year = Number(s.value); rerender(); }; };
+  // 연도: 모아온을 처음 쓴 해(firstYear)부터 '올해 + 1년'까지. 해가 바뀌면 오늘 날짜를 따라 저절로 한 칸씩 늘어나요.
+  A.years = () => { const now = Number(A.st.boot.today.slice(0, 4)), first = Math.min(Number(A.st.boot.firstYear) || now, now, A.st.year); const ys = []; for (let i = Math.max(now + 1, A.st.year); i >= first; i--) ys.push(i); return ys; };
+  A.yearSel = () => { const ys = A.years(), y = A.st.year; return `<div class="ystep" role="group" aria-label="연도"><button type="button" data-ystep="-1" aria-label="이전 해" ${y <= ys[ys.length - 1] ? 'disabled' : ''}>${MO.icon('chevL', 16)}</button><select id="yearSel" aria-label="연도 고르기">${ys.map(v => `<option ${v === y ? 'selected' : ''} value="${v}">${v}년</option>`).join('')}</select><button type="button" data-ystep="1" aria-label="다음 해" ${y >= ys[0] ? 'disabled' : ''}>${MO.icon('chevR', 16)}</button></div>`; };
+  A.bindYear = (rerender) => {
+    const s = document.getElementById('yearSel'); if (!s) return;
+    s.onchange = () => { A.st.year = Number(s.value); rerender(); };
+    s.parentElement.querySelectorAll('[data-ystep]').forEach(b => b.onclick = () => { const ys = A.years(), y = A.st.year + Number(b.dataset.ystep); if (y < ys[ys.length - 1] || y > ys[0]) return; A.st.year = y; rerender(); });
+  };
+  /* 달별로 접고 펴는 표: 가장 최근 달만 펼쳐 두고, 달 머리줄을 누르면 접히거나 펼쳐져요 (화면을 옮겨도 기억) */
+  A._mg = {};
+  A.mgroup = (key, rows, dateOf, render, summary, cols) => {
+    if (!rows.length) return '';
+    const byM = []; rows.forEach(r => { const m = dateOf(r).slice(0, 7), g = byM[byM.length - 1]; if (g && g.m === m) g.rows.push(r); else byM.push({ m, rows: [r] }); });
+    if (!A._mg[key]) A._mg[key] = new Set([byM[0].m]);
+    const open = A._mg[key];
+    return byM.map(g => { const on = open.has(g.m); return `<tr class="mgrp ${on ? 'open' : ''}" data-mg="${key}" data-m="${g.m}" tabindex="0" aria-expanded="${on}"><td colspan="${cols}"><span class="mgi">${MO.icon('chevR', 15)}</span><b>${Number(g.m.slice(5))}월</b><span class="mgc">${g.rows.length}건</span><span class="mgs">${summary(g.rows)}</span></td></tr>` + g.rows.map(r => render(r).replace('<tr', `<tr data-mrow="${g.m}"${on ? '' : ' hidden'}`)).join(''); }).join('');
+  };
+  const mgToggle = (h) => { const key = h.dataset.mg, m = h.dataset.m, set = A._mg[key] || (A._mg[key] = new Set()), on = !set.has(m); on ? set.add(m) : set.delete(m); h.classList.toggle('open', on); h.setAttribute('aria-expanded', on); h.closest('tbody').querySelectorAll(`tr[data-mrow="${m}"]`).forEach(r => { r.hidden = !on; }); };
+  document.addEventListener('click', (e) => { const h = e.target.closest('tr.mgrp'); if (h) mgToggle(h); });
+  document.addEventListener('keydown', (e) => { const h = e.target.closest && e.target.closest('tr.mgrp'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); mgToggle(h); } });
   A.xlsBtn = () => `<button class="btn o xlsb" id="xlsBtn" title="엑셀로 내보내기">${MO.icon('down', 15)}<span>엑셀</span></button>`;
   A.bindXls = (fn) => { const b = document.getElementById('xlsBtn'); if (b) b.onclick = fn; };
   A.readonlyBadge = (perm) => A.edit(perm) ? '' : `<span class="ro">${MO.icon('eye', 14)}보기 전용</span>`;

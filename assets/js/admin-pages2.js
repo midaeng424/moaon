@@ -79,7 +79,7 @@
   };
 
   /* =================== 교적부 =================== */
-  let rosSel = '', rosGrade = 0, rosQ = '', rosShowGrad = false;
+  let rosSel = '', rosGrade = 0, rosQ = '', rosShowGrad = false; const rosClosed = new Set();
   P.ros = async function (pg) {
     const canE = A.edit('ros');
     A.setTitle('교적부', (canE ? `<button class="btn o xlsb" id="impBtn" title="엑셀로 한꺼번에 등록">${MO.icon('cloud', 15)}<span>엑셀로 한꺼번에 등록</span></button>` : '') + A.xlsBtn() + A.readonlyBadge('ros')); A.bindXls(() => XP.rosOpen());
@@ -89,7 +89,9 @@
       const list = A.st.boot.students.filter(s => (rosShowGrad ? s.status === '졸업' : s.status !== '졸업') && (!rosGrade || (A.cls(s.classId) || {}).grade === rosGrade) && (!rosQ || s.name.includes(rosQ)))
         .sort((a, b) => (A.clsLabel(a.classId) + a.name).localeCompare(A.clsLabel(b.classId) + b.name, 'ko'));
       const act = A.st.boot.students.filter(s => s.status !== '졸업');
-      pg.querySelector('#slist').innerHTML = list.map(s => `<button class="srow ${s.id === rosSel ? 'on' : ''}" data-sid="${s.id}">${A.av(s.name, A.clsColor(s.classId), 38)}<div style="flex:1;min-width:0"><b>${esc(s.name)}</b><small>${esc(A.clsLabel(s.classId))}</small></div></button>`).join('') || A.empty(rosQ ? '찾는 학생이 없어요' : '학생이 없어요');
+      const grp = []; list.forEach(s => { const g = grp[grp.length - 1]; if (g && g.id === s.classId) g.list.push(s); else grp.push({ id: s.classId, list: [s] }); });
+      const row = (s) => `<button class="srow ${s.id === rosSel ? 'on' : ''}" data-sid="${s.id}">${A.av(s.name, A.clsColor(s.classId), 34)}<div style="flex:1;min-width:0"><b>${esc(s.name)}</b><small>${s.birth ? MO.md(s.birth) + ' 생일' : esc(A.clsLabel(s.classId))}</small></div></button>`;
+      pg.querySelector('#slist').innerHTML = grp.map(g => { const k = g.id || 'none', closed = !rosQ && rosClosed.has(k) && !g.list.some(s => s.id === rosSel); return `<div class="sgrp ${closed ? 'closed' : ''}"><button class="sgh" data-sgh="${k}" aria-expanded="${!closed}"><span class="mgi">${MO.icon('chevR', 14)}</span><i style="--c:${A.clsColor(g.id)}"></i><b>${esc(A.clsLabel(g.id))}</b><em>${g.list.length}명</em></button><div class="sgl">${g.list.map(row).join('')}</div></div>`; }).join('') || A.empty(rosQ ? '찾는 학생이 없어요' : '학생이 없어요');
       pg.querySelector('#sfilter').innerHTML = `<button class="chip ${!rosGrade && !rosShowGrad ? 'on' : ''}" data-g="0">전체 ${act.length}</button>${A.grades().map(g => `<button class="chip ${rosGrade === g && !rosShowGrad ? 'on' : ''}" data-g="${g}">${g}학년 ${act.filter(s => (A.cls(s.classId) || {}).grade === g).length}</button>`).join('')}${A.st.boot.students.some(s => s.status === '졸업') ? `<button class="chip ${rosShowGrad ? 'on' : ''}" data-grad="1">졸업</button>` : ''}`;
     };
     pg.innerHTML = `<div class="ros ${rosSel ? 'detail' : ''}" id="rosWrap"><div class="card slistcard" style="padding:14px"><input class="inp" id="sq" placeholder="⌕ 이름으로 찾기" value="${esc(rosQ)}" style="margin-bottom:10px"><div class="chips" id="sfilter" style="margin-bottom:8px"></div><div class="slist" id="slist"></div></div><div class="sdetail" id="sdetail"></div></div>
@@ -183,6 +185,7 @@
       };
     });
     pg.onclick = async (e) => {
+      const sg = e.target.closest('[data-sgh]'); if (sg) { const k = sg.dataset.sgh, on = rosClosed.has(k); on ? rosClosed.delete(k) : rosClosed.add(k); sg.parentElement.classList.toggle('closed', !on); sg.setAttribute('aria-expanded', on); return; }
       const r = e.target.closest('[data-sid]'); if (r) return showDetail(r.dataset.sid);
       const g = e.target.closest('[data-g]'); if (g) { rosGrade = rosGrade === +g.dataset.g ? 0 : +g.dataset.g; rosShowGrad = false; return drawList(); }
       if (e.target.closest('[data-grad]')) { rosShowGrad = !rosShowGrad; rosGrade = 0; return drawList(); }
@@ -190,6 +193,7 @@
     pg.querySelector('#sq').oninput = (e) => { rosQ = e.target.value.trim(); drawList(); };
     const fab = document.querySelector('.fab [data-new]');
     if (fab) fab.onclick = async () => { if (!A.st.boot.classes.length) return MO.toast('반 관리에서 반을 먼저 만들어 주세요', 'err'); if (await studentForm(null)) { await A.refreshBoot(); drawList(); if (rosSel) showDetail(rosSel); } };
+    if (!rosSel && innerWidth > 860) { const f = pg.querySelector('#slist .srow'); if (f) rosSel = f.dataset.sid; } // PC에서는 첫 학생을 바로 보여줘요
     if (rosSel && A.stu(rosSel)) showDetail(rosSel); else { rosSel = ''; pg.querySelector('#rosWrap').classList.remove('detail'); pg.querySelector('#sdetail').innerHTML = `<div class="card">${A.empty('왼쪽에서 학생을 골라 주세요')}</div>`; }
   };
 
@@ -288,7 +292,7 @@
     A.setTitle('권한 관리');
     const d = await MO.api('adminList', {}, { loader: false });
     const RC = { master: ['#3f3228', '#fff'], pastor: ['#e6f0fa', '#3d7cb8'], chongmu: ['#fff3d6', '#a8621f'], secretary: ['#edf5e1', '#5b8a2e'], treasurer: ['#fde8e1', '#cf5c45'] };
-    const MN = { dash: '대시보드', att: '출석', off: '헌금', tal: '달란트', acc: '회계 (수입·지출)', ver: '성경암송 관리', ros: '교적부', cls: '반 관리', report: '초등부 현황' };
+    const MN = { dash: '홈', att: '출석', off: '헌금', tal: '달란트', acc: '회계 (수입·지출)', ver: '성경암송 관리', ros: '교적부', cls: '반 관리', report: '초등부 현황' };
     const roles = ['pastor', 'chongmu', 'secretary', 'treasurer'];
     const mx = JSON.parse(JSON.stringify(d.matrix)); let dirty = false;
     const showTemp = (name, loginId, pw) => MO.alert('임시 비밀번호', `<p style="margin:0;font-weight:700">${esc(name)} (아이디 <b>${esc(loginId)}</b>)</p><div style="display:flex;gap:8px;align-items:center;margin-top:10px"><b style="font-size:24px;letter-spacing:1px;color:var(--mane);background:var(--yel-l);padding:8px 14px;border-radius:12px" id="tpw">${esc(pw)}</b><button class="btn o sm" id="cpy">복사</button></div><p class="note">이 비밀번호를 직접 전해 주세요. 첫 로그인 때 새 비밀번호로 바꾸게 돼요. 이 창을 닫으면 다시 볼 수 없어요.</p>`)
